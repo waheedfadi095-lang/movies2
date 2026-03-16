@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI!;
+const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
+  // Build should not fail when Mongo is missing; callers must handle this at runtime.
+  console.warn('MONGODB_URI is not defined – dbConnect will fail if called. TV/episodes APIs require MongoDB.');
 }
 
 /**
@@ -32,6 +33,9 @@ async function dbConnect() {
   }
 
   if (!cached?.promise) {
+    if (!MONGODB_URI) {
+      throw new Error('Please define the MONGODB_URI environment variable inside .env.local before using dbConnect.');
+    }
     const opts = {
       bufferCommands: false,
     };
