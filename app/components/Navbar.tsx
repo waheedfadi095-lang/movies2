@@ -8,6 +8,7 @@ import type { MovieListItem } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import Image from "next/image";
 import { getYear } from "@/api/tmdb";
+import SiteLogo from "@/components/SiteLogo";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -177,12 +178,12 @@ export default function Navbar() {
     };
     return keywordPages[pathname] || { 
       name: '123MOVIES', 
-      tagline: 'Watch Your Favorite Movies Online',
+      tagline: 'Watch HD Movies Online Free',
       logo: { first: '123', second: 'MOVIES' },
-      firstStyle: { color: '#1f2937', fontWeight: '800' },
-      secondStyle: { color: '#6b7280', fontWeight: '500' },
-      iconBg: '#10b981',
-      taglineColor: '#9ca3af'
+      firstStyle: { color: '#3fae2a', fontWeight: '900' },
+      secondStyle: { color: '#ffffff', fontWeight: '700' },
+      iconBg: '#3fae2a',
+      taglineColor: '#e5e5e5'
     };
   };
 
@@ -278,7 +279,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-black/50 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-30">
+    <nav className="bg-[#181818] border-b border-[#2b2b2b] sticky top-0 z-30">
       <style jsx>{`
         @keyframes shine {
           to {
@@ -288,47 +289,25 @@ export default function Navbar() {
       `}</style>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo - Left */}
+          {/* Logo - 123moviesfree style; keyword pages use getSiteInfo */}
           <div className="flex items-center">
-            <Link href="/" className="flex flex-col">
-              <div className="flex items-center">
-                <span 
-                  className="text-2xl md:text-3xl font-bold"
-                  style={siteInfo.firstStyle}
-                >
-                  {displayName.first}
-                </span>
-                {displayName.second && (
-                  <span 
-                    className="text-lg md:text-2xl ml-1"
-                    style={siteInfo.secondStyle}
-                  >
-                    {displayName.second}
-                  </span>
-                )}
-                <div 
-                  className="w-5 h-5 md:w-6 md:h-6 rounded ml-2 flex items-center justify-center transition-transform hover:scale-110"
-                  style={{ background: siteInfo.iconBg }}
-                >
-                  <svg className="w-3 h-3 md:w-4 md:h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                </div>
-              </div>
-              <p 
-                className="text-xs ml-1 hidden sm:block font-medium"
-                style={{ color: siteInfo.taglineColor }}
-              >
-                {siteInfo.tagline}
-              </p>
-            </Link>
+            <SiteLogo
+              tagline={siteInfo.tagline}
+              href="/"
+              size="nav"
+              variant="playO"
+              first={displayName.first}
+              second={displayName.second}
+              firstColor={typeof siteInfo.firstStyle.color === "string" ? siteInfo.firstStyle.color : undefined}
+              secondColor={typeof siteInfo.secondStyle.color === "string" ? siteInfo.secondStyle.color : undefined}
+            />
           </div>
           
           {/* Navigation - Center */}
           <div className="hidden md:flex items-center space-x-6">
             <Link 
               href="/home" 
-              className="text-white hover:text-red-400 transition-colors font-medium"
+              className="text-gray-200 hover:text-[#3fae2a] transition-colors font-medium"
               onClick={() => {
                 localStorage.setItem('homepageMode', 'movies');
               }}
@@ -539,7 +518,7 @@ export default function Navbar() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onFocus={() => setShowSearchResults(true)}
-                className="bg-gray-800 text-white px-4 py-2 pl-10 rounded-lg border border-gray-700 focus:outline-none focus:border-green-500 w-64"
+                className="bg-gray-800 text-white px-4 py-2 pl-10 rounded-lg border border-gray-700 focus:outline-none focus:border-[#3fae2a] w-64"
               />
               <svg className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -583,7 +562,7 @@ export default function Navbar() {
           <div className="px-4 pt-2 pb-3 space-y-1">
             <Link 
               href="/home" 
-              className="text-white hover:text-red-400 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              className="text-white hover:text-[#3fae2a] block px-3 py-2 rounded-md text-base font-medium transition-colors"
               onClick={() => {
                 setIsMenuOpen(false);
                 localStorage.setItem('homepageMode', 'movies');
@@ -643,7 +622,7 @@ export default function Navbar() {
             
             {searchLoading ? (
               <div className="p-12 text-center">
-                <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                <div className="w-12 h-12 border-4 border-[#3fae2a] border-t-transparent rounded-full animate-spin mx-auto" />
                 <p className="text-gray-400 mt-4">Loading...</p>
               </div>
             ) : searchResults.length > 0 ? (

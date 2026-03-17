@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { getMoviesByImdbIds } from "@/api/tmdb";
-import { BULK_MOVIE_IDS } from "@/data/bulkMovieIds";
 import type { Movie } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import Head from "next/head";
@@ -21,8 +20,14 @@ export default function MoviesPage() {
   const loadMovies = async () => {
     setLoading(true);
     try {
-      // Load first 100 movies from the main movies section
-      const movieIds = BULK_MOVIE_IDS.slice(10600, 10700); // Start from index 10600
+      const res = await fetch('/api/movies/list?offset=0&limit=100');
+      const data = await res.json();
+      const movieIds = (data.imdb_ids || []) as string[];
+      if (movieIds.length === 0) {
+        setMovies([]);
+        setLoading(false);
+        return;
+      }
       const moviesData = await getMoviesByImdbIds(movieIds);
       setMovies(moviesData);
     } catch (error) {
@@ -44,7 +49,7 @@ export default function MoviesPage() {
         <meta name="twitter:title" content="All Movies - Watch Free HD Movies Online" />
         <meta name="twitter:description" content="Browse thousands of free HD movies online. Watch latest movies, classic films, and popular titles without registration." />
       </Head>
-      <div className="min-h-screen bg-gray-900">
+      <div className="min-h-screen bg-[#111111]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <h1 className="text-3xl font-bold text-white mb-8">All Movies</h1>
         
@@ -79,7 +84,7 @@ export default function MoviesPage() {
                   </div>
 
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center hover:bg-green-700 hover:scale-110 transition-all duration-200">
+                    <div className="w-6 h-6 bg-[#3fae2a] rounded-full flex items-center justify-center hover:bg-[#35a024] hover:scale-110 transition-all duration-200">
                       <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z"/>
                       </svg>
@@ -87,7 +92,7 @@ export default function MoviesPage() {
                   </div>
                 </div>
                 
-                <h3 className="text-white text-xs mt-1 line-clamp-1 group-hover:text-green-400 transition-colors">
+                <h3 className="text-white text-xs mt-1 line-clamp-1 group-hover:text-[#3fae2a] transition-colors">
                   {movie.title}
                 </h3>
               </Link>

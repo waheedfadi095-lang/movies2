@@ -8,6 +8,7 @@ import { getYear, searchMoviesByTitle } from "@/api/tmdb";
 import type { Movie, MovieListItem } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import StructuredData from '@/components/StructuredData';
+import SiteLogo from '@/components/SiteLogo';
 
 export default function SimpleLandingPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,13 +49,26 @@ export default function SimpleLandingPage() {
   return (
     <>
       <StructuredData type="website" />
-      <div className="min-h-screen bg-white">
+      {/* Landing page (/) should match 123moviesfree landing: light background */} 
+      <div className="min-h-screen bg-[#f2f2f2]">
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-gray-800 mb-4">
-            123MOVIES
+          <h1 className="text-5xl font-bold text-[#333333] mb-2 tracking-tight flex items-center justify-center">
+            <span>123M</span>
+            <span className="inline-flex items-center justify-center w-[44px] h-[44px] mx-1 rounded-full bg-[#79c142] align-middle">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M9 7v10l8-5-8-5z" fill="white" />
+              </svg>
+            </span>
+            <span className="text-[#3fae2a]">VIES</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8">
             Watch Your Favorite Movies Online
@@ -68,12 +82,12 @@ export default function SimpleLandingPage() {
                 placeholder="Search movies or series"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:outline-none focus:border-red-500 text-lg"
+                className="flex-1 px-4 py-3 bg-white border border-gray-300 text-gray-800 rounded-l-sm focus:outline-none focus:border-[#3fae2a] text-lg placeholder-gray-400"
               />
               <button 
                 type="submit"
                 disabled={loading}
-                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-3 rounded-r-lg transition-colors"
+                className="bg-[#3fae2a] hover:bg-[#35a024] disabled:opacity-50 text-white px-6 py-3 rounded-r-sm transition-colors"
               >
                 {loading ? (
                   <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-white"></div>
@@ -86,7 +100,7 @@ export default function SimpleLandingPage() {
             </form>
           </div>
 
-          <Link href="/home" className="inline-block bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+          <Link href="/home" className="inline-block bg-[#3fae2a] hover:bg-[#35a024] text-white px-8 py-3 rounded font-semibold transition-colors">
             Use the old 123Movies? Click here
           </Link>
         </div>
@@ -96,7 +110,7 @@ export default function SimpleLandingPage() {
           <div className="mb-12">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-800">
-                Search Results for "{searchTerm}"
+                Search Results for &quot;{searchTerm}&quot;
               </h2>
               <button 
                 onClick={() => {
@@ -104,7 +118,7 @@ export default function SimpleLandingPage() {
                   setSearchTerm("");
                   setSearchResults([]);
                 }}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-[#3fae2a]"
               >
                 ✕ Clear
               </button>
@@ -112,7 +126,7 @@ export default function SimpleLandingPage() {
             
             {loading ? (
               <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600 mx-auto"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#3fae2a] mx-auto"></div>
                 <p className="text-gray-600 mt-4">Searching movies...</p>
               </div>
             ) : searchResults.length > 0 ? (
@@ -123,7 +137,7 @@ export default function SimpleLandingPage() {
                     onClick={() => handleMovieClick(movie)}
                     className="cursor-pointer group"
                   >
-                    <div className="relative aspect-[2/3] bg-gray-200 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300">
+                    <div className="relative aspect-[2/3] bg-white rounded overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300">
                       <Image
                         src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '/placeholder.svg'}
                         alt={movie.title}
@@ -136,7 +150,7 @@ export default function SimpleLandingPage() {
                       />
                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
+                          <div className="w-12 h-12 bg-[#3fae2a] rounded-full flex items-center justify-center">
                             <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M8 5v14l11-7z"/>
                             </svg>
@@ -145,7 +159,7 @@ export default function SimpleLandingPage() {
                       </div>
                     </div>
                     <div className="mt-3">
-                      <h3 className="text-gray-800 font-semibold text-sm line-clamp-2 group-hover:text-red-600 transition-colors">
+                      <h3 className="text-gray-800 font-semibold text-sm line-clamp-2 group-hover:text-[#3fae2a] transition-colors">
                         {movie.title}
                       </h3>
                       <p className="text-gray-500 text-xs mt-1">
@@ -157,7 +171,7 @@ export default function SimpleLandingPage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-600">No movies found for "{searchTerm}"</p>
+                <p className="text-gray-600">No movies found for &quot;{searchTerm}&quot;</p>
                 <p className="text-gray-500 text-sm mt-2">Try a different search term</p>
               </div>
             )}
@@ -269,7 +283,7 @@ export default function SimpleLandingPage() {
               on web. Copyright owners can request removal of infringing data through Cloudflare.
             </p>
 
-            <h4 className="text-xl font-bold text-gray-800 mt-8 mb-3">
+            <h4 className="text-xl font-bold text-white mt-8 mb-3">
               September Update (2025)
             </h4>
 
@@ -284,16 +298,15 @@ export default function SimpleLandingPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-black text-white mt-16">
+      {/* Footer - 123moviesfree style */}
+      <footer className="bg-[#0d0d0d] border-t border-[#2b2b2b] text-white mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Company Info */}
             <div className="space-y-4">
-              <div className="flex items-center">
-                <span className="text-3xl font-bold text-gray-800">123</span>
-                <span className="text-2xl font-normal text-gray-500 ml-1">MOVIES</span>
-                <div className="w-6 h-6 bg-green-600 rounded ml-2 flex items-center justify-center">
+              <div className="flex items-center gap-2">
+                <SiteLogo href="/" size="footer" tagline="" />
+                <div className="w-6 h-6 bg-[#3fae2a] rounded flex items-center justify-center flex-shrink-0">
                   <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z"/>
                   </svg>
@@ -326,11 +339,11 @@ export default function SimpleLandingPage() {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white">Quick Links</h3>
               <ul className="space-y-2">
-                <li><Link href="/home" className="text-gray-400 hover:text-white transition-colors text-sm">Home</Link></li>
-                <li><Link href="/movies" className="text-gray-400 hover:text-white transition-colors text-sm">All Movies</Link></li>
-                <li><Link href="/genres" className="text-gray-400 hover:text-white transition-colors text-sm">Genres</Link></li>
-                <li><Link href="/country" className="text-gray-400 hover:text-white transition-colors text-sm">Countries</Link></li>
-                <li><Link href="/search" className="text-gray-400 hover:text-white transition-colors text-sm">Search</Link></li>
+                <li><Link href="/home" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Home</Link></li>
+                <li><Link href="/movies" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">All Movies</Link></li>
+                <li><Link href="/genres" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Genres</Link></li>
+                <li><Link href="/country" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Countries</Link></li>
+                <li><Link href="/search" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Search</Link></li>
               </ul>
             </div>
 
@@ -338,18 +351,18 @@ export default function SimpleLandingPage() {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white">Popular Genres</h3>
               <ul className="space-y-2">
-                <li><Link href="/genre/action" className="text-gray-400 hover:text-white transition-colors text-sm">Action</Link></li>
-                <li><Link href="/genre/comedy" className="text-gray-400 hover:text-white transition-colors text-sm">Comedy</Link></li>
-                <li><Link href="/genre/drama" className="text-gray-400 hover:text-white transition-colors text-sm">Drama</Link></li>
-                <li><Link href="/genre/horror" className="text-gray-400 hover:text-white transition-colors text-sm">Horror</Link></li>
-                <li><Link href="/genre/romance" className="text-gray-400 hover:text-white transition-colors text-sm">Romance</Link></li>
+                <li><Link href="/genre/action" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Action</Link></li>
+                <li><Link href="/genre/comedy" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Comedy</Link></li>
+                <li><Link href="/genre/drama" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Drama</Link></li>
+                <li><Link href="/genre/horror" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Horror</Link></li>
+                <li><Link href="/genre/romance" className="text-gray-400 hover:text-[#3fae2a] transition-colors text-sm">Romance</Link></li>
               </ul>
             </div>
 
           </div>
 
           {/* Bottom Bar */}
-          <div className="border-t border-gray-700 mt-8 pt-8">
+          <div className="border-t border-[#2b2b2b] mt-8 pt-8">
             <div className="text-center">
               <div className="text-gray-500 text-sm">
                 Made with ❤️ for movie lovers

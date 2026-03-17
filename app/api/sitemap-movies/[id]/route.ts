@@ -18,20 +18,24 @@ export async function GET(
       return new NextResponse('Invalid sitemap number', { status: 400 });
     }
 
-    // Import bulk movie IDs
-    const { BULK_MOVIE_IDS } = await import('@/data/bulkMovieIds');
+    // Import latest movie list from VidSrc feed
+    const { VID_SRC_LATEST_MOVIES } = await import('@/data/vidsrcLatestMovies');
+    
+    const totalMovies = VID_SRC_LATEST_MOVIES.length;
     
     // Calculate start and end indices for this sitemap
     const startIndex = (sitemapNumber - 1) * MOVIES_PER_SITEMAP;
-    const endIndex = Math.min(startIndex + MOVIES_PER_SITEMAP, BULK_MOVIE_IDS.length);
+    const endIndex = Math.min(startIndex + MOVIES_PER_SITEMAP, totalMovies);
     
     // Check if sitemap number is valid
-    if (startIndex >= BULK_MOVIE_IDS.length) {
+    if (startIndex >= totalMovies) {
       return new NextResponse('Sitemap not found', { status: 404 });
     }
     
     // Get movie IDs for this chunk
-    const movieIdsChunk = BULK_MOVIE_IDS.slice(startIndex, endIndex);
+    const movieIdsChunk = VID_SRC_LATEST_MOVIES.slice(startIndex, endIndex)
+      .map((m) => m.imdb_id)
+      .filter((id) => !!id && id.trim() !== '');
     
     console.log(`Generating sitemap ${sitemapNumber}: Movies ${startIndex}-${endIndex} (${movieIdsChunk.length} movies)`);
     

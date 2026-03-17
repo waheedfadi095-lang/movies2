@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+/* 123moviesfree.net style - same colors/theme across site */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #111111;
+  --foreground: #f3f3f3;
+  --header-bg: #181818;
+  --header-border: #2b2b2b;
+  --brand-green: #3fae2a;
+  --brand-green-hover: #35a024;
+  --card-bg: #1a1a1a;
+  --surface: #1f1f1f;
 }
 
 @theme inline {
@@ -10,13 +17,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {

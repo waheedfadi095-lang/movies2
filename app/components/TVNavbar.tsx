@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import SearchModal from "./SearchModal";
+import SiteLogo from "./SiteLogo";
 
 export default function TVNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -53,30 +54,23 @@ export default function TVNavbar() {
   };
 
   return (
-    <nav className="bg-purple-900/50 backdrop-blur-sm border-b border-purple-700 sticky top-0 z-30">
+    <nav className="bg-[#181818] border-b border-[#2b2b2b] sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo - Left */}
           <div className="flex items-center">
-            <Link href="/" className="flex flex-col">
-              <div className="flex items-center">
-                <span className="text-2xl md:text-3xl font-bold text-gray-800">123</span>
-                <span className="text-lg md:text-2xl font-normal text-gray-500 ml-1">SEASONS</span>
-                <div className="w-5 h-5 md:w-6 md:h-6 bg-purple-600 rounded ml-2 flex items-center justify-center">
-                  <svg className="w-3 h-3 md:w-4 md:h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                </div>
-              </div>
-              <p className="text-purple-400 text-xs ml-1 hidden sm:block">Watch TV Seasons & Episodes Online</p>
-            </Link>
+            <SiteLogo
+              tagline="Watch HD Movies & TV Series Online Free"
+              href="/"
+              size="nav"
+              variant="playO"
+            />
           </div>
           
           {/* Navigation - Center */}
           <div className="hidden md:flex items-center space-x-6">
             <Link 
               href="/home" 
-              className="text-white hover:text-purple-400 transition-colors font-medium"
+              className="text-gray-200 hover:text-[#3fae2a] transition-colors font-medium"
               onClick={() => {
                 localStorage.setItem('homepageMode', 'tv');
                 // Dispatch event to update navbar immediately
@@ -121,7 +115,7 @@ export default function TVNavbar() {
                       <Link href="/tv-genre/documentary" className="block text-gray-300 hover:text-white transition-colors text-sm">Documentary</Link>
                       <Link href="/tv-genre/animation" className="block text-gray-300 hover:text-white transition-colors text-sm">Animation</Link>
                       <Link href="/tv-genre/reality" className="block text-gray-300 hover:text-white transition-colors text-sm">Reality</Link>
-                      <Link href="/tv-genre/all" className="block text-purple-400 hover:text-white transition-colors text-sm font-semibold">View All Genres</Link>
+                      <Link href="/tv-genre/all" className="block text-[#3fae2a] hover:text-white transition-colors text-sm font-semibold">View All Genres</Link>
                     </div>
                   </div>
                 </div>
@@ -194,7 +188,7 @@ export default function TVNavbar() {
               <input
                 type="text"
                 placeholder="Search TV series"
-                className="bg-gray-800 text-white px-4 py-2 pl-10 pr-4 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500 w-64 cursor-pointer"
+                className="bg-gray-800 text-white px-4 py-2 pl-10 pr-4 rounded-lg border border-gray-700 focus:outline-none focus:border-[#3fae2a] w-64 cursor-pointer"
                 onClick={() => setIsSearchOpen(true)}
                 readOnly
               />
@@ -228,7 +222,7 @@ export default function TVNavbar() {
           <div className="px-4 pt-2 pb-3 space-y-1">
             <Link 
               href="/home" 
-              className="text-white hover:text-purple-400 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              className="text-white hover:text-[#3fae2a] block px-3 py-2 rounded-md text-base font-medium transition-colors"
               onClick={() => {
                 setIsMenuOpen(false);
                 localStorage.setItem('homepageMode', 'tv');

@@ -8,10 +8,10 @@ const ITEMS_PER_SITEMAP = 1000; // 1k per sitemap
 
 export async function GET() {
   try {
-    // Import bulk movie IDs to calculate number of sitemaps needed
-    const { BULK_MOVIE_IDS } = await import('@/data/bulkMovieIds');
+    // Import latest movie list from VidSrc to calculate number of sitemaps needed
+    const { VID_SRC_LATEST_MOVIES } = await import('@/data/vidsrcLatestMovies');
     
-    const totalMovies = BULK_MOVIE_IDS.length;
+    const totalMovies = VID_SRC_LATEST_MOVIES.length;
     const numberOfMovieSitemaps = Math.ceil(totalMovies / ITEMS_PER_SITEMAP);
     
     // Get total series count from MongoDB
