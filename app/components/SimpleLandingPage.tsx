@@ -71,7 +71,7 @@ export default function SimpleLandingPage() {
             <span className="text-[#3fae2a]">VIES</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Watch Your Favorite Movies Online
+            Stream Your Favorite Movies &amp; TV Shows in Full HD
           </p>
           
           {/* Search Bar */}
@@ -181,106 +181,83 @@ export default function SimpleLandingPage() {
         {/* Genre List */}
         <div className="mb-12">
           <p className="text-gray-700 text-lg leading-relaxed">
-            Action, Adventure, Animation, Biography, Comedy, Crime, Documentary, Drama, Family, Fantasy, Game show, History, Horror, Musical, Mystery, News, Reality, Romance, Sci-Fi, TV Movie, Thriller, War
+            Explore thousands of movies and TV shows across every genre: Action, Adventure, Animation, Biography, Comedy, Crime, Documentary, Drama, Family, Fantasy, Game Show, History, Horror, Musical, Mystery, News, Reality, Romance, Sci-Fi, TV Movie, Thriller and War.
           </p>
         </div>
 
         {/* Main Content */}
         <div className="prose prose-lg max-w-none">
           <h2 className="text-3xl font-bold text-gray-800 mb-6">
-            123Movies - Watch HD Movies Online Free | 123movie | 123 movies
+            123Movies – Watch Free Full HD Movies Online | 123movie | 123 movies
           </h2>
 
           <div className="space-y-6 text-gray-700 leading-relaxed">
             <p>
-              While other free streaming sites can be a pain to use and are often riddled with malware, 
-              require signup with your credit card information (which can be misused), 123movies is 
-              simple, requires no subscription or account and lets you watch movies anytime anywhere, 
-              as long as you have a laptop/smartphone and the Internet, its smooth and seamless.
+              Most free streaming sites are full of annoying ads, malware and fake “free trial” traps that ask for your credit card. 123Movies is different. There is <strong>no signup, no subscription and no hidden fees</strong> – just click, play and enjoy. As long as you have an internet connection and a laptop or smartphone, you can watch your favorite movies smoothly and without hassle.
             </p>
 
             <p>
-              Choose a movie and you are good to go! 123movies can be a great companion for a friends 
-              or family get-together or a date night. Movies are a great source of entertainment while 
-              reducing boredom for at least three hours at a stretch. 123movies only intends to link 
-              only legal videos on internet. A bucket of popcorn or your munchies to go along and you 
-              are set for a great time ahead.
+              Just choose a movie and you’re good to go. 123Movies is perfect for a friends’ night in, a family movie evening or a cozy date night. Movies are one of the easiest ways to relax and kill boredom for a few hours. Our goal is to link only to legal videos already available on the internet. Grab your popcorn or favorite snacks and enjoy a great streaming experience.
             </p>
 
             <h3 className="text-2xl font-bold text-gray-800 mt-12 mb-4">
-              Why Choose 123movies?
+              Why Choose 123Movies?
             </h3>
             
             <h4 className="text-xl font-bold text-gray-800 mb-3">
-              123movies is One of a kind
+              123Movies Is One of a Kind
             </h4>
 
             <p>
-              We stand out from other streaming websites as we don't require a subscription or account 
-              to watch movies. We provide best quality videos for a great viewing experience. You will 
-              have a great time watching the movies of your choice with no compromise in quality. 
-              Movies from many Genre. You can find movies without scrolling down a lot. We are 
-              non-region-specific.
+              We stand out from other streaming sites because you don’t need an account or subscription to start watching. We focus on delivering high-quality video streams for a better viewing experience. You can quickly find the movies you want without endless scrolling, and we’re not limited to a single region – 123Movies is accessible from many countries around the world.
             </p>
 
             <p>
-              Even though you may like a certain type of genre, there are times when you want to bring 
-              a change. 123movies can be accessed Anytime Anywhere, You choose a time and a place and 
-              we are right there for you to help out.
+              Even if you’re loyal to one favorite genre, there are times you want something new. With 123Movies, you can easily switch between genres and discover fresh titles anytime. You can access the site whenever and wherever you like – we’re always just a click away when you’re in the mood for a movie.
             </p>
 
             <h3 className="text-2xl font-bold text-gray-800 mt-12 mb-4">
-              Benefits of online movie streaming on 123movies
+              Benefits of Streaming Movies Online on 123Movies
             </h3>
 
             <p>
-              Online streaming has replaced the old way of waiting for DVDs and movie tickets. 
-              We have listed the merits of online movie streaming on 123movies.
+              Online streaming has replaced the old days of waiting for DVDs or cinema showtimes. With 123Movies, you can start watching instantly. Here are some of the key benefits of using 123Movies for online streaming.
             </p>
 
             <h4 className="text-xl font-bold text-gray-800 mt-8 mb-3">
-              You save time By using 123movies
+              Save Time with 123Movies
             </h4>
 
             <p>
-              You don't have to download movies and watch them later. You can watch them seamlessly 
-              online. You save time by not having to wait for the download to complete.
+              There’s no need to download huge files and wait for them to finish. Just press play and watch instantly in your browser. Skipping the download step saves you time and keeps your device storage free.
             </p>
 
             <h4 className="text-xl font-bold text-gray-800 mt-8 mb-3">
-              You save money by using 123movie
+              Save Money with 123Movies
             </h4>
 
             <p>
-              Watching movies is free. The only cost is the internet. 123movies links movies available 
-              on web. It functions like a collective library. Like search engines, 123movies links to 
-              data available on web.
+              Watching movies on 123Movies is completely free – the only thing you pay for is your internet connection. 123Movies simply links to movies already available on the web, working like a giant, organized library. Just like a search engine, we help you find content that’s already online.
             </p>
 
             <h4 className="text-xl font-bold text-gray-800 mt-8 mb-3">
-              123movies is compatible with all devices and new browsers
+              123Movies Works on All Modern Devices and Browsers
             </h4>
 
             <p>
-              You can watch movies on your computer, laptop, tablet, mobile phone. It works well with 
-              Chrome, Safari, Firefox latest versions. It doesn't support old browser versions. 
-              123movies doesn't link to 4K videos. You never run out of entertainment on 123movies.
+              You can watch movies on your computer, laptop, tablet or smartphone. 123Movies works smoothly on modern browsers like Chrome, Safari and Firefox (latest versions). Older browsers may not be supported. While we don’t link to 4K videos, you’ll never run out of entertainment – our collection keeps growing and there’s always something new to watch.
             </p>
 
             <p>
-              When it comes to watching a movie and being entertained, there is no limit. Our database 
-              will take a lifetime to get exhausted. 123movies keeps on adding new data.
+              When it comes to movies and entertainment, there’s no real limit. Our database is constantly updated and would take a lifetime to fully explore. 123Movies keeps adding new titles so you always have something fresh to enjoy.
             </p>
 
             <h4 className="text-xl font-bold text-gray-800 mt-8 mb-3">
-              123movies a better bond in a relationship
+              123Movies Helps You Bond Better
             </h4>
 
             <p>
-              Anyone who watches movies with friends and family is known to have a better bonding when 
-              compared to the rest. The reason being the fact that they share the same experience and 
-              emotions. 123moviesfree.net does not store any data. It only links to data only available 
-              on web. Copyright owners can request removal of infringing data through Cloudflare.
+              People who watch movies together with friends, family or partners often build stronger bonds because they share the same stories, emotions and memories. 123moviesfree.net does not store any video files itself – it only links to content that is already available on the web. Copyright owners can request removal of infringing content through Cloudflare, and we respect those requests.
             </p>
 
             <h4 className="text-xl font-bold text-white mt-8 mb-3">
@@ -288,11 +265,7 @@ export default function SimpleLandingPage() {
             </h4>
 
             <p>
-              Server costs are increasing due to rising energy prices in Europe. Currently, it does not 
-              affect the website performance. We operate on a net zero profit model. We expect prices 
-              to lower in the summer. We have improved the search index for more sources. We intend to 
-              serve only legal and movies already available on web. We continuously work on improving 
-              code and user experience.
+              Server costs have increased due to rising energy prices in Europe, but this currently does not affect the website’s performance. We operate on a near zero-profit model and expect hosting prices to ease in the coming months. Recently, we improved our search index to include more sources and better results. Our intention is to link only to legal movies and videos that are already available on the web, and we continuously work on improving both our code and the overall user experience.
             </p>
           </div>
         </div>
