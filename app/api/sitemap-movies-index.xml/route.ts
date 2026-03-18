@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getBaseUrlForBuild } from '@/lib/domain';
+import { BULK_MOVIE_IDS } from '@/data/bulkMovieIds';
 
 const DOMAIN = getBaseUrlForBuild();
 const ITEMS_PER_SITEMAP = 50000; // 50k per sitemap
 
 export async function GET() {
   try {
-    // Use the same latest movies source as movie sitemaps
-    const { VID_SRC_LATEST_MOVIES } = await import('@/data/vidsrcLatestMovies');
-
-    const totalMovies = VID_SRC_LATEST_MOVIES.length;
+    const totalMovies = BULK_MOVIE_IDS.length;
     const numberOfMovieSitemaps = Math.ceil(totalMovies / ITEMS_PER_SITEMAP);
 
     const lastmod = new Date().toISOString();

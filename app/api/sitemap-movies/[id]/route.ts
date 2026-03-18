@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateMovieUrl } from '@/lib/slug';
 import { getMovieByImdbId } from '@/api/tmdb';
 import { getBaseUrlForBuild } from '@/lib/domain';
+import { BULK_MOVIE_IDS } from '@/data/bulkMovieIds';
 
 const DOMAIN = getBaseUrlForBuild();
 const MOVIES_PER_SITEMAP = 50000; // 50k per sitemap batch
@@ -18,10 +19,7 @@ export async function GET(
       return new NextResponse('Invalid sitemap number', { status: 400 });
     }
 
-    // Import latest movie list from VidSrc feed
-    const { VID_SRC_LATEST_MOVIES } = await import('@/data/vidsrcLatestMovies');
-    
-    const totalMovies = VID_SRC_LATEST_MOVIES.length;
+    const totalMovies = BULK_MOVIE_IDS.length;
     
     // Calculate start and end indices for this sitemap
     const startIndex = (sitemapNumber - 1) * MOVIES_PER_SITEMAP;
@@ -33,9 +31,8 @@ export async function GET(
     }
     
     // Get movie IDs for this chunk
-    const movieIdsChunk = VID_SRC_LATEST_MOVIES.slice(startIndex, endIndex)
-      .map((m) => m.imdb_id)
-      .filter((id) => !!id && id.trim() !== '');
+    const movieIdsChunk = BULK_MOVIE_IDS.slice(startIndex, endIndex)
+      .filter((imdbId) => !!imdbId && imdbId.trim() !== '');
     
     console.log(`Generating sitemap ${sitemapNumber}: Movies ${startIndex}-${endIndex} (${movieIdsChunk.length} movies)`);
     
