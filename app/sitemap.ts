@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 
 import { getBaseUrlForBuild } from '@/lib/domain';
+import { TV_SERIES_IDS } from '@/data/tvSeriesIds';
 
 const DOMAIN = getBaseUrlForBuild();
 
@@ -12,6 +13,9 @@ const DOMAIN = getBaseUrlForBuild();
  * The complete sitemap with all 95k+ movies is available via the sitemap index
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const SERIES_PER_SITEMAP = 1000;
+  const totalSeries = TV_SERIES_IDS.length;
+  const numberOfSeriesSitemaps = Math.ceil(totalSeries / SERIES_PER_SITEMAP);
   // Main static pages - basic fallback
   const staticPages: MetadataRoute.Sitemap = [
     {
@@ -52,5 +56,61 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  return staticPages;
+  // Also expose all sitemap XML endpoints as URLs inside sitemap.xml
+  const sitemapXmlLinks: MetadataRoute.Sitemap = [
+    // Dynamic sitemap index (movies + TV series + pages, years, genres, countries, landing pages)
+    {
+      url: `${DOMAIN}/api/sitemap-index.xml`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    // Static XML sitemap files under /sitemaps (movies)
+    {
+      url: `${DOMAIN}/sitemaps/sitemap-index.xml`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${DOMAIN}/sitemaps/sitemap-pages.xml`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${DOMAIN}/sitemaps/sitemap-years.xml`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${DOMAIN}/sitemaps/sitemap-genres.xml`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${DOMAIN}/sitemaps/sitemap-countries.xml`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    // Pre-generated movie sitemap XML files
+    ...Array.from({ length: 10 }, (_, i) => ({
+      url: `${DOMAIN}/sitemaps/sitemap-movies-${i + 1}.xml`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.8,
+    })),
+    // Dynamic TV series sitemap endpoints (covering all 17k+ series)
+    ...Array.from({ length: numberOfSeriesSitemaps }, (_, i) => ({
+      url: `${DOMAIN}/api/sitemap-series/${i + 1}`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.8,
+    })),
+  ];
+
+  return [...staticPages, ...sitemapXmlLinks];
 }
