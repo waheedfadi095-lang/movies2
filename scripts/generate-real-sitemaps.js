@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const DOMAIN = 'https://ww1.n123movie.me';
+const DOMAIN = 'https://ww1.n123movie.top';
 const TMDB_API_KEY = process.env.TMDB_API_KEY || '4ff7e44ae992bcf0bc04b隐藏ed56dc'; // Your TMDB key
 const OUTPUT_DIR = path.join(__dirname, '../public/sitemaps-final');
 

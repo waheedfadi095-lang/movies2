@@ -1,5 +1,5 @@
 /** Sirf yahan default domain change karein – baaki sab isi se aata hai */
-const DEFAULT_SITE_URL = 'https://ww1.n123movie.me';
+const DEFAULT_SITE_URL = 'https://ww1.n123movie.top';
 
 /**
  * Get the current domain dynamically based on the request

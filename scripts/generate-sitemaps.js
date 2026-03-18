@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DOMAIN = 'https://ww1.n123movie.me';
+const DOMAIN = 'https://ww1.n123movie.top';
 
 // Create output directory
 const outputDir = path.join(__dirname, '../public/sitemaps');

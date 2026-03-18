@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const DOMAIN = 'https://ww1.n123movie.me';
+const DOMAIN = 'https://ww1.n123movie.top';
 const TMDB_API_KEY = 'b31d2e5f33b74ffa7b3b483ff353f760'; // From your tmdb.ts file
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const OUTPUT_DIR = path.join(__dirname, '../public/sitemaps-real');
