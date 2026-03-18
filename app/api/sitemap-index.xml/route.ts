@@ -1,18 +1,57 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 import { getBaseUrlForBuild } from '@/lib/domain';
-import { BULK_MOVIE_IDS } from '@/data/bulkMovieIds';
 import { TV_SERIES_IDS } from '@/data/tvSeriesIds';
 
 const DOMAIN = getBaseUrlForBuild();
 const ITEMS_PER_SITEMAP = 50000; // 50k per sitemap
 
+function countMoviesFromBatches(): number {
+  const scriptsDir = path.join(process.cwd(), 'scripts');
+  if (!fs.existsSync(scriptsDir)) {
+    return 0;
+  }
+
+  const batchFiles = fs
+    .readdirSync(scriptsDir)
+    .filter((file) => file.startsWith('batch-') && file.endsWith('-results.json'));
+
+  let count = 0;
+
+  for (const batchFile of batchFiles) {
+    try {
+      const batchPath = path.join(scriptsDir, batchFile);
+      const raw = fs.readFileSync(batchPath, 'utf8');
+      const batchData = JSON.parse(raw) as any[];
+
+      batchData.forEach((movie) => {
+        const imdbId = movie.imdb_id || movie.imdbId;
+        if (imdbId && movie.title && movie.year && movie.poster) {
+          count += 1;
+        }
+      });
+    } catch (err) {
+      console.error(`Error counting movies in batch file for main sitemap index: ${batchFile}`, err);
+    }
+  }
+
+  return count;
+}
+
 export async function GET() {
   try {
-    const totalMovies = BULK_MOVIE_IDS.length;
-    const numberOfMovieSitemaps = Math.ceil(totalMovies / ITEMS_PER_SITEMAP);
+    const totalMovies = countMoviesFromBatches();
+    const numberOfMovieSitemaps = Math.max(
+      1,
+      Math.ceil(totalMovies / ITEMS_PER_SITEMAP)
+    );
 
     const totalSeries = TV_SERIES_IDS.length;
-    const numberOfSeriesSitemaps = Math.ceil(totalSeries / ITEMS_PER_SITEMAP);
+    const numberOfSeriesSitemaps = Math.max(
+      1,
+      Math.ceil(totalSeries / ITEMS_PER_SITEMAP)
+    );
     
     console.log(`Total movies: ${totalMovies}, Number of movie sitemaps: ${numberOfMovieSitemaps}`);
     console.log(`Total series: ${totalSeries}, Number of series sitemaps: ${numberOfSeriesSitemaps}`);

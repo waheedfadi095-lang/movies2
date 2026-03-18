@@ -1,11 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 import { generateMovieUrl } from '@/lib/slug';
-import { getMovieByImdbId } from '@/api/tmdb';
 import { getBaseUrlForBuild } from '@/lib/domain';
-import { BULK_MOVIE_IDS } from '@/data/bulkMovieIds';
 
 const DOMAIN = getBaseUrlForBuild();
 const MOVIES_PER_SITEMAP = 50000; // 50k per sitemap batch
+
+type BatchMovie = {
+  imdbId?: string;
+  imdb_id?: string;
+  title?: string;
+  year?: number;
+  poster?: string;
+};
+
+function loadAllBatchMovies(): { imdb_id: string; title: string }[] {
+  const scriptsDir = path.join(process.cwd(), 'scripts');
+  if (!fs.existsSync(scriptsDir)) {
+    return [];
+  }
+
+  const batchFiles = fs
+    .readdirSync(scriptsDir)
+    .filter((file) => file.startsWith('batch-') && file.endsWith('-results.json'))
+    .sort((a, b) => {
+      const aNum = parseInt(a.match(/batch-(\d+)-results\.json/)?.[1] || '0', 10);
+      const bNum = parseInt(b.match(/batch-(\d+)-results\.json/)?.[1] || '0', 10);
+      return aNum - bNum;
+    });
+
+  const allMovies: { imdb_id: string; title: string }[] = [];
+
+  for (const batchFile of batchFiles) {
+    try {
+      const batchPath = path.join(scriptsDir, batchFile);
+      const raw = fs.readFileSync(batchPath, 'utf8');
+      const batchData = JSON.parse(raw) as BatchMovie[];
+
+      batchData.forEach((movie) => {
+        const imdbId = movie.imdb_id || movie.imdbId;
+        if (!imdbId || !movie.title || !movie.year || !movie.poster) {
+          return;
+        }
+        allMovies.push({
+          imdb_id: imdbId,
+          title: movie.title,
+        });
+      });
+    } catch (err) {
+      console.error(`Error reading batch file for sitemap: ${batchFile}`, err);
+    }
+  }
+
+  return allMovies;
+}
 
 export async function GET(
   request: NextRequest,
@@ -19,7 +68,9 @@ export async function GET(
       return new NextResponse('Invalid sitemap number', { status: 400 });
     }
 
-    const totalMovies = BULK_MOVIE_IDS.length;
+    // Load the same movies that power the site UI (from batch JSON files)
+    const allMovies = loadAllBatchMovies();
+    const totalMovies = allMovies.length;
     
     // Calculate start and end indices for this sitemap
     const startIndex = (sitemapNumber - 1) * MOVIES_PER_SITEMAP;
@@ -30,53 +81,28 @@ export async function GET(
       return new NextResponse('Sitemap not found', { status: 404 });
     }
     
-    // Get movie IDs for this chunk
-    const movieIdsChunk = BULK_MOVIE_IDS.slice(startIndex, endIndex)
-      .filter((imdbId) => !!imdbId && imdbId.trim() !== '');
+    // Get movies for this chunk
+    const moviesChunk = allMovies.slice(startIndex, endIndex);
     
-    console.log(`Generating sitemap ${sitemapNumber}: Movies ${startIndex}-${endIndex} (${movieIdsChunk.length} movies)`);
+    console.log(
+      `Generating sitemap ${sitemapNumber}: Movies ${startIndex}-${endIndex} (${moviesChunk.length} movies)`
+    );
     
     // Generate sitemap XML directly from movie IDs (without TMDB API call for speed)
     const lastmod = new Date().toISOString();
     
     // Generate sitemap XML with actual movie URLs (title-slug format)
-    const urlEntries = await Promise.all(
-      movieIdsChunk
-        .filter(imdbId => imdbId && imdbId.trim() !== '')
-        .map(async (imdbId) => {
-          try {
-            // Get movie details to generate proper URL
-            const movie = await getMovieByImdbId(imdbId);
-            if (movie && movie.title) {
-              // Generate URL using the same logic as movie pages
-              const url = generateMovieUrl(movie.title, movie.imdb_id);
-              return `  <url>
+    const urlEntries = moviesChunk
+      .filter((movie) => movie.imdb_id && movie.title)
+      .map((movie) => {
+        const url = generateMovieUrl(movie.title, movie.imdb_id);
+        return `  <url>
     <loc>${DOMAIN}${url}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`;
-            } else {
-              // Fallback to IMDB ID format if movie not found
-              return `  <url>
-    <loc>${DOMAIN}/${imdbId}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`;
-            }
-          } catch (error) {
-            console.error(`Error processing movie ${imdbId}:`, error);
-            // Fallback to IMDB ID format
-            return `  <url>
-    <loc>${DOMAIN}/${imdbId}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`;
-          }
-        })
-    );
+      });
     
     const urlEntriesString = urlEntries.join('\n');
     
