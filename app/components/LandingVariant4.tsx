@@ -7,6 +7,7 @@ import Image from "next/image";
 import { getYear, searchMoviesByTitle } from "@/api/tmdb";
 import type { MovieListItem } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
+import { resolvePosterUrl } from "@/lib/poster";
 
 interface ColorTheme {
   primary: string;
@@ -215,7 +216,7 @@ export default function LandingVariant4({ keyword, description, colorTheme, cont
                   >
                     <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-gray-200 mb-4 shadow-lg group-hover:shadow-2xl transition-all duration-500">
                       <Image
-                        src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '/placeholder.svg'}
+                        src={resolvePosterUrl(movie.poster_path, "w500")}
                         alt={movie.title}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-700"

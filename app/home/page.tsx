@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getMoviesByImdbIds } from "@/api/tmdb";
 // REMOVED: import { BULK_MOVIE_IDS } from "@/data/bulkMovieIds"; // 1.4MB - Now lazy loaded
 // REMOVED: import { TV_SERIES_STATIC } from "@/data/tvSeriesStatic"; // 61MB - Now lazy loaded
@@ -12,6 +12,40 @@ import type { Movie } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import { getTVImageUrl } from "@/api/tmdb-tv";
 import SiteLogo from "@/components/SiteLogo";
+import referenceHomeMapped from "@/data/referenceHomeMapped.json";
+import { resolvePosterUrl } from "@/lib/poster";
+
+// Shared GET cache to avoid duplicate homepage requests.
+const homeRequestCache = new Map<string, { at: number; data: any }>();
+const homePendingRequests = new Map<string, Promise<any>>();
+const HOME_CACHE_TTL_MS = 60 * 1000;
+
+async function fetchCachedJson(url: string, ttlMs: number = HOME_CACHE_TTL_MS) {
+  const now = Date.now();
+  const cached = homeRequestCache.get(url);
+  if (cached && now - cached.at < ttlMs) {
+    return cached.data;
+  }
+
+  const pending = homePendingRequests.get(url);
+  if (pending) {
+    return pending;
+  }
+
+  const request = fetch(url)
+    .then(async (response) => {
+      const data = await response.json();
+      return { ok: response.ok, data };
+    })
+    .finally(() => {
+      homePendingRequests.delete(url);
+    });
+
+  homePendingRequests.set(url, request);
+  const result = await request;
+  homeRequestCache.set(url, { at: now, data: result });
+  return result;
+}
 
 // TV Search Modal Component
 function TVSearchModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -35,11 +69,10 @@ function TVSearchModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
 
       setLoading(true);
       try {
-        const response = await fetch(`/api/tv-series-search?q=${encodeURIComponent(searchTerm)}&limit=10`);
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-          setSuggestions(result.data);
+        const url = `/api/tv-series-search?q=${encodeURIComponent(searchTerm)}&limit=10`;
+        const { ok, data } = await fetchCachedJson(url, 2 * 60 * 1000);
+        if (ok && data.success && data.data) {
+          setSuggestions(data.data);
         }
       } catch (error) {
         console.error('Error searching TV series:', error);
@@ -179,10 +212,10 @@ function TVSeriesDisplay({ activeCategory, categoryConfig }: { activeCategory: s
     }
     
     // Fetch only 14 series for category (fast loading)
-    fetch(`/api/tv-series-db?limit=14&sortBy=${sortBy}&sortOrder=${sortOrder}${additionalFilters}`)
-      .then(res => res.json())
-      .then(result => {
-        if (result.success && result.data) {
+    const url = `/api/tv-series-db?limit=14&sortBy=${sortBy}&sortOrder=${sortOrder}${additionalFilters}`;
+    fetchCachedJson(url)
+      .then(({ ok, data: result }) => {
+        if (ok && result.success && result.data) {
           const seriesData = result.data.map((data: any) => ({
             imdbId: data.imdb_id,
           tmdbId: data.tmdb_id,
@@ -329,6 +362,7 @@ export default function HomePage() {
   const [latestTvSeries, setLatestTvSeries] = useState<any[]>([]);
   const [popularTvSeries, setPopularTvSeries] = useState<any[]>([]);
   const [featuredTvSeries, setFeaturedTvSeries] = useState<any[]>([]);
+  const [referencePostersByTitle, setReferencePostersByTitle] = useState<Record<string, string>>({});
   const [itemsPerRow, setItemsPerRow] = useState(12);
   const DISPLAY_COUNT = 12;
   const homeGridClass =
@@ -339,6 +373,9 @@ export default function HomePage() {
   
   // TV Search Modal state
   const [isTVSearchOpen, setIsTVSearchOpen] = useState(false);
+  const didInitLoadRef = useRef(false);
+  const didInitSectionsRef = useRef(false);
+  const didLoadTvSectionsRef = useRef(false);
   
   // Load saved mode from localStorage on mount (ONLY if explicitly set)
   useEffect(() => {
@@ -371,8 +408,15 @@ export default function HomePage() {
   ];
 
   const categoryConfig = currentMode === 'movies' ? movieCategoryConfig : tvCategoryConfig;
+  const normalizeTitle = (title: string) => title.trim().toLowerCase();
+  const getMoviePosterSrc = (movie: Movie) => {
+    const refPoster = referencePostersByTitle[normalizeTitle(movie.title)];
+    return resolvePosterUrl(movie.poster_path, "w500", refPoster);
+  };
 
   useEffect(() => {
+    if (didInitLoadRef.current) return;
+    didInitLoadRef.current = true;
     loadAllCategories();
     
     // Auto-refresh disabled for better performance
@@ -400,115 +444,76 @@ export default function HomePage() {
 
   // Load "Latest Movies" and "Latest TV-Series" sections like reference site
   useEffect(() => {
+    if (didInitSectionsRef.current) return;
+    didInitSectionsRef.current = true;
     (async () => {
-      // 1) Try to match reference site's Suggestions + Latest Movies by their titles.
-      // If this fails, we just fall back to our own data below.
       try {
-        const refRes = await fetch(`/api/reference/home-mapped`);
-        const refData = await refRes.json();
-        if (refRes.ok) {
-          const suggestionsIds = (refData.suggestionsImdbIds || []) as string[];
-          const latestIds = (refData.latestMoviesImdbIds || []) as string[];
-
-          // Map "Suggestions" titles -> our movies
-          if (suggestionsIds.length) {
-            const mappedSuggestions = await getMoviesByImdbIds(suggestionsIds);
-            if (mappedSuggestions.length) {
-              // If less than DISPLAY_COUNT, top-up from our own Suggestions API
-              let finalSuggestions = mappedSuggestions.slice(0, DISPLAY_COUNT);
-              if (finalSuggestions.length < DISPLAY_COUNT) {
-                try {
-                  const moreRes = await fetch(
-                    `/api/movies/latest?category=suggestions&limit=${DISPLAY_COUNT}`
-                  );
-                  const moreData = await moreRes.json();
-                  if (moreRes.ok && Array.isArray(moreData.movies)) {
-                    for (const m of moreData.movies) {
-                      if (
-                        finalSuggestions.length >= DISPLAY_COUNT ||
-                        finalSuggestions.some((x) => x.imdb_id === m.imdb_id)
-                      ) {
-                        continue;
-                      }
-                      finalSuggestions.push(m);
-                    }
-                  }
-                } catch {
-                  // ignore top-up errors
-                }
-              }
-              setAllMovies(finalSuggestions);
-              setCategories((prev) => ({ ...prev, Suggestions: finalSuggestions }));
-            }
+        const { ok: refHomeOk, data: refHomeData } = await fetchCachedJson(`/api/reference/home`);
+        if (refHomeOk) {
+          const allRefItems = [
+            ...(Array.isArray(refHomeData?.suggestions) ? refHomeData.suggestions : []),
+            ...(Array.isArray(refHomeData?.latestMovies) ? refHomeData.latestMovies : []),
+          ];
+          const posterMap: Record<string, string> = {};
+          for (const item of allRefItems) {
+            if (!item?.title || !item?.poster) continue;
+            posterMap[normalizeTitle(item.title)] = item.poster;
           }
+          setReferencePostersByTitle(posterMap);
+        }
+      } catch (error) {
+        console.error("Failed to load reference posters:", error);
+      }
 
-          // Map "Latest Movies" titles -> our movies
-          if (latestIds.length) {
-            const mappedLatest = await getMoviesByImdbIds(latestIds);
-            if (mappedLatest.length) {
-              let finalLatest = mappedLatest.slice(0, DISPLAY_COUNT);
-              if (finalLatest.length < DISPLAY_COUNT) {
-                try {
-                  const moreRes = await fetch(
-                    `/api/movies/latest?category=latest&limit=${DISPLAY_COUNT}`
-                  );
-                  const moreData = await moreRes.json();
-                  if (moreRes.ok && Array.isArray(moreData.movies)) {
-                    for (const m of moreData.movies) {
-                      if (
-                        finalLatest.length >= DISPLAY_COUNT ||
-                        finalLatest.some((x) => x.imdb_id === m.imdb_id)
-                      ) {
-                        continue;
-                      }
-                      finalLatest.push(m);
-                    }
-                  }
-                } catch {
-                  // ignore
-                }
-              }
-              setLatestMovies(finalLatest);
-            }
+      // Use locally saved mapped IDs (no repeated search/scrape).
+      try {
+        const suggestionsIds = (referenceHomeMapped.suggestionsImdbIds || []).slice(0, DISPLAY_COUNT);
+        const latestIds = (referenceHomeMapped.latestMoviesImdbIds || []).slice(0, DISPLAY_COUNT);
+
+        if (suggestionsIds.length > 0) {
+          const mappedSuggestions = await getMoviesByImdbIds(suggestionsIds);
+          if (mappedSuggestions.length > 0) {
+            setAllMovies(mappedSuggestions);
+            setCategories((prev) => ({ ...prev, Suggestions: mappedSuggestions }));
           }
         }
-      } catch {}
 
-      try {
-        // Fetch more than we render (we render exactly 2 rows)
-        const latestRes = await fetch(`/api/movies/latest?category=latest&limit=${DISPLAY_COUNT}`);
-        const latestData = await latestRes.json();
-        if (latestRes.ok && Array.isArray(latestData.movies)) {
-          // Only overwrite if we didn't already map from reference
-          setLatestMovies((prev) => (prev?.length ? prev : latestData.movies));
+        if (latestIds.length > 0) {
+          const mappedLatest = await getMoviesByImdbIds(latestIds);
+          if (mappedLatest.length > 0) {
+            setLatestMovies(mappedLatest);
+          }
         }
-      } catch {}
+      } catch (error) {
+        console.error("Failed to load local reference mapped movies:", error);
+      }
 
-      try {
-        const tvRes = await fetch(`/api/tv-series-db?limit=${DISPLAY_COUNT}&sortBy=first_air_date&sortOrder=desc`);
-        const tvData = await tvRes.json();
-        if (tvRes.ok && tvData?.success && Array.isArray(tvData.data)) {
-          setLatestTvSeries(tvData.data);
-        }
-      } catch {}
-
-      try {
-        const tvRes = await fetch(`/api/tv-series-db?limit=${DISPLAY_COUNT}&sortBy=vote_average&sortOrder=desc&minRating=7.0`);
-        const tvData = await tvRes.json();
-        if (tvRes.ok && tvData?.success && Array.isArray(tvData.data)) {
-          setPopularTvSeries(tvData.data);
-        }
-      } catch {}
-
-      try {
-        const tvRes = await fetch(`/api/tv-series-db?limit=${DISPLAY_COUNT}&sortBy=vote_average&sortOrder=desc&minRating=8.0`);
-        const tvData = await tvRes.json();
-        if (tvRes.ok && tvData?.success && Array.isArray(tvData.data)) {
-          setFeaturedTvSeries(tvData.data);
-        }
-      } catch {}
     })();
   }, []);
+
+  // Load TV homepage sections only when user switches to TV mode.
+  useEffect(() => {
+    if (currentMode !== "tv") return;
+    if (didLoadTvSectionsRef.current) return;
+    didLoadTvSectionsRef.current = true;
+
+    (async () => {
+      const [tvSectionsRes] = await Promise.allSettled([
+        fetchCachedJson(`/api/tv-series/home-sections?limit=${DISPLAY_COUNT}`),
+      ]);
+
+      if (
+        tvSectionsRes.status === "fulfilled" &&
+        tvSectionsRes.value.ok &&
+        tvSectionsRes.value.data?.success
+      ) {
+        const sections = tvSectionsRes.value.data.sections || {};
+        if (Array.isArray(sections.latest)) setLatestTvSeries(sections.latest);
+        if (Array.isArray(sections.popular)) setPopularTvSeries(sections.popular);
+        if (Array.isArray(sections.featured)) setFeaturedTvSeries(sections.featured);
+      }
+    })();
+  }, [currentMode, DISPLAY_COUNT]);
 
   // Mode switching functions
   const switchToMovies = () => {
@@ -530,51 +535,41 @@ export default function HomePage() {
   const loadAllCategories = async () => {
     setLoading(true);
     try {
-      // Try to get all sections at once with unique movies (14 per category for fast loading)
-      const response = await fetch(`/api/movies/sections?limit=14`);
-      const data = await response.json();
-      
-      if (response.ok && data.sections) {
-        // Map API categories to our category names
-        const categoryMap: {[key: string]: string} = {
-          "Suggestions": "suggestions",
-          "Trending Now": "trending",
-          "Top Rated": "top_rated",
-          "TV Shows": "tv_shows"
-        };
-        
-        const categoriesData: {[key: string]: Movie[]} = {};
-        
-        for (const category of categoryConfig) {
-          const apiCategory = categoryMap[category.name];
-          if (apiCategory && data.sections[apiCategory]) {
-            categoriesData[category.name] = data.sections[apiCategory];
-            console.log(`✅ ${category.name}: ${data.sections[apiCategory].length} unique movies loaded`);
-          }
-        }
-        
-        // Never overwrite Suggestions if it was already set (e.g. from reference mapping)
-        setCategories((prev) => {
-          const next = { ...prev, ...categoriesData };
-          if (prev.Suggestions) {
-            next.Suggestions = prev.Suggestions;
-          }
-          return next;
-        });
-        
-        // Set initial movies to suggestions only if allMovies is still empty
-        if (data.sections.suggestions) {
-          setAllMovies((prev) => (prev && prev.length > 0 ? prev : data.sections.suggestions));
-        }
-      } else {
-        console.log('⚠️ Sections API failed, using individual category loading');
-        await loadCategoriesIndividually();
+      // 1) Fast first paint: load Suggestions first.
+      const { ok: suggestionsOk, data: suggestionsData } = await fetchCachedJson(
+        `/api/movies/latest?category=suggestions&limit=${DISPLAY_COUNT}`
+      );
+      if (suggestionsOk && Array.isArray(suggestionsData.movies) && suggestionsData.movies.length > 0) {
+        setCategories((prev) => ({ ...prev, Suggestions: suggestionsData.movies }));
+        setAllMovies((prev) => (prev && prev.length > 0 ? prev : suggestionsData.movies));
+      }
+      setLoading(false);
+
+      // 2) Background: load other movie sections.
+      const [latestRes, topRatedRes] = await Promise.allSettled([
+        fetchCachedJson(`/api/movies/latest?category=latest&limit=${DISPLAY_COUNT}`),
+        fetchCachedJson(`/api/movies/latest?category=top_rated&limit=${DISPLAY_COUNT}`),
+      ]);
+
+      if (
+        latestRes.status === "fulfilled" &&
+        latestRes.value.ok &&
+        Array.isArray(latestRes.value.data?.movies)
+      ) {
+        setLatestMovies(latestRes.value.data.movies);
+      }
+
+      if (
+        topRatedRes.status === "fulfilled" &&
+        topRatedRes.value.ok &&
+        Array.isArray(topRatedRes.value.data?.movies)
+      ) {
+        setCategories((prev) => ({ ...prev, "Top Rated": topRatedRes.value.data.movies }));
       }
     } catch (error) {
-      console.error('Error loading sections:', error);
-      await loadCategoriesIndividually();
+      console.error('Error loading categories progressively:', error);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const loadCategoriesIndividually = async () => {
@@ -591,16 +586,14 @@ export default function HomePage() {
         };
         
         const apiCategory = apiCategoryMap[category.name] || "latest";
-        const response = await fetch(`/api/movies/latest?category=${apiCategory}&limit=${category.count}`);
-        const data = await response.json();
+        const { ok: responseOk, data } = await fetchCachedJson(`/api/movies/latest?category=${apiCategory}&limit=${category.count}`);
         
-        if (response.ok && data.movies && data.movies.length > 0) {
+        if (responseOk && data.movies && data.movies.length > 0) {
           console.log(`✅ ${category.name}: ${data.movies.length} movies loaded`);
           categoriesData[category.name] = data.movies;
         } else {
           console.log(`⚠️ ${category.name}: Using fallback - fetching slice from API (no client big file)`);
-          const res = await fetch(`/api/movies/list?offset=${category.startIndex}&limit=${category.count}&order=desc`);
-          const listData = await res.json();
+          const { data: listData } = await fetchCachedJson(`/api/movies/list?offset=${category.startIndex}&limit=${category.count}&order=desc`);
           const movieIds = (listData.imdb_ids || []) as string[];
           const moviesData = movieIds.length ? await getMoviesByImdbIds(movieIds) : [];
           categoriesData[category.name] = moviesData;
@@ -769,7 +762,7 @@ export default function HomePage() {
                         <div className="bg-white rounded shadow overflow-hidden">
                           <div className="relative aspect-[2/3]">
                             <Image
-                              src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : "/placeholder.svg"}
+                              src={getMoviePosterSrc(movie)}
                               alt={movie.title}
                               fill
                               className="object-cover"
@@ -808,7 +801,7 @@ export default function HomePage() {
                       <div className="bg-white rounded shadow overflow-hidden">
                         <div className="relative aspect-[2/3]">
                           <Image
-                            src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : "/placeholder.svg"}
+                            src={getMoviePosterSrc(movie)}
                             alt={movie.title}
                             fill
                             className="object-cover"
@@ -829,51 +822,41 @@ export default function HomePage() {
                 </div>
               </section>
 
-              {/* Latest TV-Series (also visible on Movies home like reference) */}
+              {/* Top Rated (Movies) */}
               <section>
                 <div className="mb-3">
                   <div className="inline-flex items-center bg-[#79c142] text-white text-base md:text-lg font-bold px-4 py-2 rounded">
-                    Latest TV-Series
+                    Top Rated
                   </div>
                 </div>
                 <div className={homeGridClass}>
-                  {latestTvSeries.slice(0, DISPLAY_COUNT).map((series: any, index: number) => {
-                    const name = series.name || `TV Series ${series.imdb_id || series.tmdb_id || index}`;
-                    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-                    const href = `/${slug}-${series.tmdb_id || series.tmdbId || series.imdb_id || series.imdbId || ""}`;
-                    const eps =
-                      series?.seasons?.reduce?.((sum: number, s: any) => sum + (s?.episodes?.length || 0), 0) ||
-                      series?.episodeCount ||
-                      0;
-                    return (
-                      <Link key={`tv-latest-movies-${series.tmdb_id ?? series.imdb_id ?? index}-${index}`} href={href} className="group block">
-                        <div className="bg-white rounded shadow overflow-hidden">
-                          <div className="relative aspect-[2/3]">
-                            <Image
-                              src={series.poster_path ? getTVImageUrl(series.poster_path, "w500") : "/placeholder.svg"}
-                              alt={name}
-                              fill
-                              className="object-cover"
-                              unoptimized={true}
-                            />
-                            <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                              TV
-                            </span>
-                            {eps > 0 && (
-                              <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                                Eps {eps}
-                              </span>
-                            )}
-                          </div>
-                          <div className="bg-black px-2 py-2">
-                            <div className="text-white text-xs font-semibold line-clamp-1">
-                              {name}
-                            </div>
+                  {(categories["Top Rated"] || latestMovies).slice(0, DISPLAY_COUNT).map((movie: any, index: number) => (
+                    <Link
+                      key={`top-rated-m-${movie.imdb_id ?? index}-${index}`}
+                      href={generateMovieUrl(movie.title, movie.imdb_id)}
+                      className="group block"
+                    >
+                      <div className="bg-white rounded shadow overflow-hidden">
+                        <div className="relative aspect-[2/3]">
+                          <Image
+                            src={getMoviePosterSrc(movie)}
+                            alt={movie.title}
+                            fill
+                            className="object-cover"
+                            unoptimized={true}
+                          />
+                          <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                            HD
+                          </span>
+                        </div>
+                        <div className="bg-black px-2 py-2">
+                          <div className="text-white text-xs font-semibold line-clamp-1">
+                            {movie.title}
                           </div>
                         </div>
-                      </Link>
-                    );
-                  })}
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </section>
             </>

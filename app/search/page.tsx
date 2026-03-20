@@ -9,6 +9,7 @@ import { getRandomMovieIds } from "@/data/bulkMovieIds";
 import type { Movie } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import Head from "next/head";
+import { resolvePosterUrl } from "@/lib/poster";
 
 function SearchResultsContent() {
   const searchParams = useSearchParams();
@@ -143,7 +144,7 @@ function SearchResultsContent() {
                 {/* Movie Poster */}
                 <div className="relative aspect-[2/3] bg-gray-700">
                   <Image
-                    src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '/placeholder.svg'}
+                    src={resolvePosterUrl(movie.poster_path, "w500")}
                     alt={movie.title}
                     fill
                     className="object-cover group-hover:brightness-110 transition-all duration-300"

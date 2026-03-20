@@ -9,6 +9,7 @@ import type { Movie, MovieListItem } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import StructuredData from '@/components/StructuredData';
 import SiteLogo from '@/components/SiteLogo';
+import { resolvePosterUrl } from "@/lib/poster";
 
 export default function SimpleLandingPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -139,7 +140,7 @@ export default function SimpleLandingPage() {
                   >
                     <div className="relative aspect-[2/3] bg-white rounded overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300">
                       <Image
-                        src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '/placeholder.svg'}
+                        src={resolvePosterUrl(movie.poster_path, "w500")}
                         alt={movie.title}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"

@@ -6,6 +6,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import clientPromise from '@/lib/mongodb-client';
+import { resolvePosterUrl } from "@/lib/poster";
 
 interface SeasonPageProps {
   params: Promise<{
@@ -115,6 +116,8 @@ export default async function SeasonPage({ params }: SeasonPageProps) {
   
   // Fetch episodes from MongoDB database (optional)
   let episodes: EpisodeData[] = [];
+  let dbSeriesPosterPath: string | null = null;
+  let dbSeriesBackdropPath: string | null = null;
   try {
     const client = await clientPromise;
     if (client) {
@@ -124,6 +127,8 @@ export default async function SeasonPage({ params }: SeasonPageProps) {
     
     // First get the series from our database to get the IMDB ID
     const seriesData = await seriesCollection.findOne({ tmdb_id: tmdbId });
+    dbSeriesPosterPath = (seriesData?.poster_path as string | null) ?? null;
+    dbSeriesBackdropPath = (seriesData?.backdrop_path as string | null) ?? null;
     
     if (!seriesData || !seriesData.imdb_id) {
       console.log(`No series found in database for TMDB ID ${tmdbId}`);
@@ -158,9 +163,10 @@ export default async function SeasonPage({ params }: SeasonPageProps) {
   }
 
   // When no episodes from DB, use TMDB so season page still shows episode list
+  let tmdbSeasonEpisodes = await getSeasonEpisodes(tmdbId, seasonNumber);
+
   if (episodes.length === 0) {
-    const tmdbEpisodes = await getSeasonEpisodes(tmdbId, seasonNumber);
-    episodes = tmdbEpisodes.map((ep) => ({
+    episodes = tmdbSeasonEpisodes.map((ep) => ({
       episode_imdb_id: ep.imdb_id || `tmdb-${tmdbId}-${seasonNumber}-${ep.episode_number}`,
       episode_number: ep.episode_number,
       episode_name: ep.name,
@@ -169,6 +175,19 @@ export default async function SeasonPage({ params }: SeasonPageProps) {
       air_date: ep.air_date,
       vote_average: ep.vote_average,
       runtime: ep.runtime,
+    }));
+  }
+
+  // Even when DB episodes exist, prefer TMDB still frames for thumbnails.
+  // DB still_path can be stale/blank/black for some rows.
+  if (episodes.length > 0 && tmdbSeasonEpisodes.length > 0) {
+    const tmdbStillByEpisode = new Map<number, string | null>();
+    for (const ep of tmdbSeasonEpisodes) {
+      tmdbStillByEpisode.set(ep.episode_number, ep.still_path || null);
+    }
+    episodes = episodes.map((ep) => ({
+      ...ep,
+      still_path: tmdbStillByEpisode.get(ep.episode_number) || ep.still_path,
     }));
   }
   
@@ -213,15 +232,24 @@ export default async function SeasonPage({ params }: SeasonPageProps) {
             >
               <div className="flex flex-col md:flex-row gap-4 p-4">
                 {/* Episode Thumbnail */}
-                <div className="relative w-full md:w-80 h-48 md:h-auto flex-shrink-0 bg-gray-700 rounded overflow-hidden">
+                <div className="relative w-full md:w-80 h-48 md:h-48 flex-shrink-0 bg-gray-300 rounded overflow-hidden border border-gray-600">
                   <Image
-                    src={getTVImageUrl(episode.still_path, 'w500')}
+                    src={resolvePosterUrl(
+                      episode.still_path ||
+                        dbSeriesPosterPath ||
+                        series.poster_path ||
+                        dbSeriesBackdropPath ||
+                        series.backdrop_path,
+                      "w500"
+                    )}
                     alt={`${series.name} S${seasonNumber}E${episode.episode_number}`}
                     fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-200"
+                    sizes="(max-width: 768px) 100vw, 320px"
+                    className="object-cover object-top group-hover:scale-105 transition-transform duration-200"
+                    unoptimized
                   />
                   {/* Play Button Overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200">
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-all duration-200">
                     <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all duration-200">
                       <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z"/>

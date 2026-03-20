@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import type { Movie } from '../api/tmdb';
 import { getBaseUrl, getBaseUrlForBuild } from './domain';
+import { resolvePosterUrl } from './poster';
 
 export interface SEOConfig {
   title: string;
@@ -26,8 +27,8 @@ export function generateMovieSEO(movie: Movie, baseUrl?: string): SEOConfig {
     .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
   
   const movieUrl = `${currentBaseUrl}/${titleSlug}-${movie.imdb_id}`;
-  const posterUrl = movie.poster_path 
-    ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+  const posterUrl = movie.poster_path
+    ? resolvePosterUrl(movie.poster_path, "w500")
     : `${currentBaseUrl}/placeholder.svg`;
 
   // Generate comprehensive SEO keywords

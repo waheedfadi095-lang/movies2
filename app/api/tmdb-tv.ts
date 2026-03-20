@@ -235,7 +235,39 @@ export function getTVImageUrl(path: string | null | undefined, size: 'w92' | 'w1
   if (!path || path.trim() === '') {
     return '/placeholder.svg';
   }
-  return `https://image.tmdb.org/t/p/${size}${path}`;
+
+  const p = path.trim();
+
+  // Protocol-relative URLs from scraped/legacy sources, e.g. //img.cdn.com/file.jpg
+  if (p.startsWith('//')) {
+    return `https:${p}`;
+  }
+
+  // Host-only absolute URLs (no protocol), e.g. image.tmdb.org/t/p/w500/xxx.jpg
+  if (p.startsWith('image.tmdb.org')) {
+    return `https://${p.replace(/^\/+/, '')}`;
+  }
+  if (p.startsWith('img.icdn.my.id') || p.includes('img.icdn.my.id')) {
+    return `https://${p.replace(/^\/+/, '')}`;
+  }
+
+  // Some data sources may already store a full TMDB URL like:
+  // "https://image.tmdb.org/t/p/w500/xxxx.jpg"
+  if (p.startsWith('http://') || p.startsWith('https://')) {
+    // If it is already a TMDB image URL, normalize it to the requested size.
+    if (p.includes('image.tmdb.org/t/p/')) {
+      // Examples:
+      // - /t/p/w500/xxxx.jpg
+      // - /t/p/w500/xxxx.jpg?query=...
+      return p.replace(/(image\.tmdb\.org\/t\/p\/)[^/]+\/?/, `$1${size}/`);
+    }
+    return p; // Other CDNs - just return as-is
+  }
+
+  // Normal TMDB "path" format (e.g. "/xxxx.jpg" or "xxxx.jpg")
+  // Some sources may store values without leading "/".
+  const normalizedPath = p.startsWith('/') ? p : `/${p}`;
+  return `https://image.tmdb.org/t/p/${size}${normalizedPath}`;
 }
 
 // Helper function to format season/episode number (e.g., S01E01)

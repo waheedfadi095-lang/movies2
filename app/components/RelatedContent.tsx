@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { resolvePosterUrl } from '@/lib/poster';
 
 interface RelatedMovie {
   imdb_id: string;
@@ -30,7 +31,7 @@ export default function RelatedContent({ movies, title, baseUrl }: RelatedConten
           >
             <div className="relative aspect-[2/3] bg-gray-700 rounded overflow-hidden shadow-lg group-hover:shadow-2xl transition-all duration-300">
               <Image
-                src={movie.poster_path ? `https://image.tmdb.org/t/p/w300${movie.poster_path}` : '/placeholder.svg'}
+                src={resolvePosterUrl(movie.poster_path, "w300")}
                 alt={`${movie.title} movie poster`}
                 fill
                 className="object-cover group-hover:scale-105 transition-transform duration-300"

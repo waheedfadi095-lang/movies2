@@ -6,6 +6,7 @@ import Image from "next/image";
 import { getYear, searchMoviesByTitle } from "@/api/tmdb";
 import type { Movie } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
+import { resolvePosterUrl } from "@/lib/poster";
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -176,7 +177,7 @@ export default function SearchModal({ isOpen, onClose, searchType = 'movies' }: 
                     >
                       <div className="relative w-12 h-16 bg-gray-700 rounded overflow-hidden flex-shrink-0">
                         <Image
-                          src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '/placeholder.svg'}
+                          src={resolvePosterUrl(item.poster_path, "w500")}
                           alt={item.title || item.name}
                           width={48}
                           height={64}

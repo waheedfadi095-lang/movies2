@@ -4,10 +4,11 @@ import Image from "next/image";
 import clientPromise from '@/lib/mongodb-client';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import { getEmbedServers } from '@/lib/embed-config';
-import { getSeasonEpisodes, getTVSeriesById } from '@/api/tmdb-tv';
+import { getSeasonEpisodes, getTVSeriesById, getTVImageUrl } from '@/api/tmdb-tv';
 import { extractEpisodeIdFromSlug, extractTmdbEpisodeFromSlug } from '@/lib/episode-slug';
 import type { Metadata } from 'next';
 import { getCanonicalBase } from '@/lib/domain';
+import { resolvePosterUrl } from '@/lib/poster';
 
 export async function getEpisodeData(slug: string) {
   const episodeId = extractEpisodeIdFromSlug(slug);
@@ -179,7 +180,13 @@ export default async function EpisodePageContent({ slug }: { slug: string }) {
                 <div className="flex-shrink-0 mx-auto md:mx-0">
                   <div className="w-32 md:w-48">
                     <Image
-                      src={episode.still_path ? `https://image.tmdb.org/t/p/w500${episode.still_path}` : (series?.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : '/placeholder.svg')}
+                      src={
+                        episode.still_path
+                          ? getTVImageUrl(episode.still_path, 'w500')
+                          : series?.poster_path
+                            ? getTVImageUrl(series.poster_path, 'w500')
+                            : '/placeholder.svg'
+                      }
                       alt={`${episode.episode_name} episode still`}
                       width={192}
                       height={288}
@@ -247,7 +254,7 @@ export default async function EpisodePageContent({ slug }: { slug: string }) {
                 <Link href={`/${seriesSlug}/season-${episode.season_number}`} className="flex gap-3 hover:bg-gray-50 p-2 rounded transition-colors">
                   <div className="w-16 h-20 rounded flex-shrink-0 overflow-hidden">
                     <Image
-                      src={series?.poster_path ? `https://image.tmdb.org/t/p/w300${series.poster_path}` : '/placeholder.svg'}
+                      src={resolvePosterUrl(series?.poster_path, "w300")}
                       alt={`Season ${episode.season_number}`}
                       width={64}
                       height={80}
@@ -262,7 +269,7 @@ export default async function EpisodePageContent({ slug }: { slug: string }) {
                   <Link href={`/${seriesSlug}`} className="flex gap-3 hover:bg-gray-50 p-2 rounded transition-colors">
                     <div className="w-16 h-20 rounded flex-shrink-0 overflow-hidden">
                       <Image
-                        src={series.poster_path ? `https://image.tmdb.org/t/p/w300${series.poster_path}` : '/placeholder.svg'}
+                        src={resolvePosterUrl(series.poster_path, "w300")}
                         alt={series.name}
                         width={64}
                         height={80}

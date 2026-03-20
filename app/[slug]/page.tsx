@@ -15,6 +15,7 @@ import EmbedPlayer from '@/components/EmbedPlayer';
 import { getEmbedServers } from '@/lib/embed-config';
 import { isEpisodeSlug } from '@/lib/episode-slug';
 import EpisodePageContent, { getEpisodeMetadata } from '@/components/EpisodePageContent';
+import { resolvePosterUrl } from "@/lib/poster";
 
 interface MoviePageProps {
   params: Promise<{
@@ -473,7 +474,7 @@ export default async function MoviePage({ params }: MoviePageProps) {
                 <div className="flex-shrink-0 mx-auto md:mx-0">
                   <div className="w-32 md:w-48">
                     <Image
-                      src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '/placeholder.svg'}
+                      src={resolvePosterUrl(movie.poster_path, "w500")}
                       alt={`${movie.title} movie poster`}
                       width={192}
                       height={288}
@@ -630,7 +631,7 @@ export default async function MoviePage({ params }: MoviePageProps) {
                 >
                   <div className="relative w-24 h-16 sm:w-32 sm:h-20 rounded overflow-hidden flex-shrink-0">
                     <Image
-                      src={similarMovie.poster_path ? `https://image.tmdb.org/t/p/w300${similarMovie.poster_path}` : '/placeholder.svg'}
+                      src={resolvePosterUrl(similarMovie.poster_path, "w300")}
                       alt={`${similarMovie.title} movie poster`}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-200"

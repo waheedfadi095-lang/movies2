@@ -7,6 +7,7 @@ import { getMoviesByImdbIds } from "@/api/tmdb";
 import { BULK_MOVIE_IDS } from "@/data/bulkMovieIds";
 import type { Movie } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
+import { resolvePosterUrl } from "@/lib/poster";
 
 interface CountryPageProps {
   params: Promise<{
@@ -109,7 +110,7 @@ export default function CountryPage({ params }: CountryPageProps) {
                 >
                   <div className="relative aspect-[2/3] bg-gray-800 rounded overflow-hidden shadow-lg group-hover:shadow-2xl transition-all duration-300">
                     <Image
-                      src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '/placeholder.svg'}
+                      src={resolvePosterUrl(movie.poster_path, "w500")}
                       alt={`${movie.title} movie poster`}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-300"

@@ -1,5 +1,6 @@
 import { Movie } from '@/api/tmdb';
 import { getBaseUrlForBuild } from '@/lib/domain';
+import { resolvePosterUrl } from '@/lib/poster';
 
 interface StructuredDataProps {
   movie?: Movie;
@@ -16,7 +17,7 @@ export default function StructuredData({ movie, series, type }: StructuredDataPr
       "@type": "Movie",
       "name": movie.title,
       "description": movie.overview,
-      "image": movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : undefined,
+      "image": movie.poster_path ? resolvePosterUrl(movie.poster_path, "w500") : undefined,
       "url": `${baseUrl}/${movie.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${movie.imdb_id}`,
       "datePublished": movie.release_date,
       "genre": movie.genres?.map(genre => genre.name),
@@ -48,7 +49,7 @@ export default function StructuredData({ movie, series, type }: StructuredDataPr
       "@type": "TVSeries",
       "name": series.name,
       "description": series.overview,
-      "image": series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : undefined,
+      "image": series.poster_path ? resolvePosterUrl(series.poster_path, "w500") : undefined,
       "url": `${baseUrl}/${series.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${series.id}`,
       "datePublished": series.first_air_date,
       "genre": series.genres?.map((genre: any) => genre.name),
