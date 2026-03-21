@@ -290,7 +290,6 @@ function TVSeriesDisplay({ activeCategory, categoryConfig }: { activeCategory: s
                     alt={series.name}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-200"
-                    unoptimized={true}
                   />
                 ) : (
                   <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center">
@@ -766,7 +765,6 @@ export default function HomePage() {
                               alt={movie.title}
                               fill
                               className="object-cover"
-                              unoptimized={true}
                             />
                             <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                               HD
@@ -805,7 +803,6 @@ export default function HomePage() {
                             alt={movie.title}
                             fill
                             className="object-cover"
-                            unoptimized={true}
                           />
                           <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                             HD
@@ -843,7 +840,6 @@ export default function HomePage() {
                             alt={movie.title}
                             fill
                             className="object-cover"
-                            unoptimized={true}
                           />
                           <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                             HD
@@ -887,7 +883,6 @@ export default function HomePage() {
                               alt={name}
                               fill
                               className="object-cover"
-                              unoptimized={true}
                             />
                             <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                               TV
@@ -935,7 +930,6 @@ export default function HomePage() {
                               alt={name}
                               fill
                               className="object-cover"
-                              unoptimized={true}
                             />
                             <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                               TV
@@ -983,7 +977,6 @@ export default function HomePage() {
                               alt={name}
                               fill
                               className="object-cover"
-                              unoptimized={true}
                             />
                             <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                               TV

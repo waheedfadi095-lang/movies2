@@ -14,11 +14,12 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-    formats: ['image/webp', 'image/avif'],
-    minimumCacheTTL: 86400, // 24 hours
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    /** Always load remote `src` directly in the browser — no Next/Vercel image optimizer. */
+    /**
+     * Direct URLs only — no `/_next/image` optimizer (no custom loader needed).
+     * `formats` / `minimumCacheTTL` only apply when optimized; omitted to avoid dead config.
+     */
     unoptimized: true,
   },
   // Production optimizations

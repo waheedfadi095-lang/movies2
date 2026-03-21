@@ -246,7 +246,6 @@ export default async function SeasonPage({ params }: SeasonPageProps) {
                     fill
                     sizes="(max-width: 768px) 100vw, 320px"
                     className="object-cover object-top group-hover:scale-105 transition-transform duration-200"
-                    unoptimized
                   />
                   {/* Play Button Overlay */}
                   <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-all duration-200">
