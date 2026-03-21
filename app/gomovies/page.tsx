@@ -1,4 +1,4 @@
-import LandingVariant3 from "../components/LandingVariant3";
+import GomoviesStyleLanding from "../components/keyword-landings/GomoviesStyleLanding";
 import type { Metadata } from "next";
 import { getCanonicalBase } from "@/lib/domain";
 
@@ -72,7 +72,7 @@ const colorTheme = {
 
 export default function GomoviesPage() {
   return (
-    <LandingVariant3
+    <GomoviesStyleLanding
       keyword="Gomovies"
       description="Watch Free Movies and TV Shows in HD"
       colorTheme={colorTheme}

@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "screenshot:landings": "node scripts/capture-landing-screenshots.mjs"
   },
   "dependencies": {
     "dotenv": "^16.6.1",

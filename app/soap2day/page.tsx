@@ -1,4 +1,4 @@
-import LandingVariant2 from "../components/LandingVariant2";
+import Soap2dayStyleLanding from "../components/keyword-landings/Soap2dayStyleLanding";
 import type { Metadata } from "next";
 import { getCanonicalBase } from "@/lib/domain";
 
@@ -72,7 +72,7 @@ const colorTheme = {
 
 export default function Soap2DayPage() {
   return (
-    <LandingVariant2
+    <Soap2dayStyleLanding
       keyword="Soap2Day"
       description="Instant Access to Premium Entertainment"
       colorTheme={colorTheme}

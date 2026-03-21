@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 
 /**
  * 123moviesfree.net style logo:
@@ -25,6 +26,11 @@ export type SiteLogoProps = {
   firstColor?: string;
   /** Optional custom second part color */
   secondColor?: string;
+  /** Extra styles for split variant first span (e.g. gradient text) */
+  firstSpanStyle?: CSSProperties;
+  secondSpanStyle?: CSSProperties;
+  /** Tagline text color (header) */
+  taglineColor?: string;
 };
 
 const sizeClasses = {
@@ -42,6 +48,9 @@ export default function SiteLogo({
   second = "MOVIES",
   firstColor = BRAND_GREEN,
   secondColor = "#ffffff",
+  firstSpanStyle,
+  secondSpanStyle,
+  taglineColor,
 }: SiteLogoProps) {
   const c = sizeClasses[size];
   // Match the cap-height of the text in each size
@@ -75,23 +84,43 @@ export default function SiteLogo({
           </span>
         </div>
         {tagline && (
-          <p className={`${c.tag} font-medium text-gray-400 hidden sm:block`}>
+          <p
+            className={`${c.tag} font-medium hidden sm:block ${taglineColor ? "" : "text-gray-400"}`}
+            style={taglineColor ? { color: taglineColor } : undefined}
+          >
             {tagline}
           </p>
         )}
       </>
     ) : (
       <>
-        <div className={`flex items-center ${c.wrap}`}>
-          <span className={`${c.first} font-black tracking-tight`} style={{ color: firstColor }}>
+        <div className={`flex flex-wrap items-baseline ${c.wrap}`}>
+          <span
+            className={`${c.first} font-black tracking-tight`}
+            style={{
+              ...(firstColor ? { color: firstColor } : {}),
+              ...firstSpanStyle,
+            }}
+          >
             {first}
           </span>
-          <span className={`${c.second} font-bold tracking-tight`} style={{ color: secondColor }}>
-            {second}
-          </span>
+          {second ? (
+            <span
+              className={`${c.second} font-bold tracking-tight`}
+              style={{
+                ...(secondColor ? { color: secondColor } : {}),
+                ...secondSpanStyle,
+              }}
+            >
+              {second}
+            </span>
+          ) : null}
         </div>
         {tagline && (
-          <p className={`${c.tag} font-medium text-gray-400 hidden sm:block`}>
+          <p
+            className={`${c.tag} font-medium hidden sm:block ${taglineColor ? "" : "text-gray-400"}`}
+            style={taglineColor ? { color: taglineColor } : undefined}
+          >
             {tagline}
           </p>
         )}

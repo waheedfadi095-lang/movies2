@@ -1,4 +1,4 @@
-import LandingVariant6 from "../components/LandingVariant6";
+import SolarmovieStyleLanding from "../components/keyword-landings/SolarmovieStyleLanding";
 import type { Metadata } from "next";
 import { getCanonicalBase } from "@/lib/domain";
 
@@ -72,7 +72,7 @@ const colorTheme = {
 
 export default function SolarmoviesPage() {
   return (
-    <LandingVariant6
+    <SolarmovieStyleLanding
       keyword="Solarmovie"
       description="Streaming Sunshine for Movie Lovers"
       colorTheme={colorTheme}

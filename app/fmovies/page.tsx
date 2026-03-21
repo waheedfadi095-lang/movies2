@@ -1,4 +1,4 @@
-import LandingVariant1 from "../components/LandingVariant1";
+import FmoviesStyleLanding from "../components/keyword-landings/FmoviesStyleLanding";
 import type { Metadata } from "next";
 import { getCanonicalBase } from "@/lib/domain";
 
@@ -72,7 +72,7 @@ const colorTheme = {
 
 export default function FmoviesPage() {
   return (
-    <LandingVariant1
+    <FmoviesStyleLanding
       keyword="Fmovies"
       description="Unlimited Streaming of Movies and TV Series"
       colorTheme={colorTheme}

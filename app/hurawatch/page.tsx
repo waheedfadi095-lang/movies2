@@ -1,4 +1,4 @@
-import LandingVariant4 from "../components/LandingVariant4";
+import HurawatchStyleLanding from "../components/keyword-landings/HurawatchStyleLanding";
 import type { Metadata } from "next";
 import { getCanonicalBase } from "@/lib/domain";
 
@@ -72,7 +72,7 @@ const colorTheme = {
 
 export default function HurawatchPage() {
   return (
-    <LandingVariant4
+    <HurawatchStyleLanding
       keyword="Hurawatch"
       description="Free HD Streaming Without Limits"
       colorTheme={colorTheme}

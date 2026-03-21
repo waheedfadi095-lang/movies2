@@ -10,6 +10,7 @@ import Image from "next/image";
 import { getYear } from "@/api/tmdb";
 import SiteLogo from "@/components/SiteLogo";
 import { resolvePosterUrl } from "@/lib/poster";
+import { getExtendedKeywordNavInfo } from "@/lib/keywordNavBranding";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -177,19 +178,23 @@ export default function Navbar() {
         taglineColor: '#9333ea'
       }
     };
-    return keywordPages[pathname] || { 
-      name: '123MOVIES', 
-      tagline: 'Watch HD Movies Online Free',
-      logo: { first: '123', second: 'MOVIES' },
-      firstStyle: { color: '#3fae2a', fontWeight: '900' },
-      secondStyle: { color: '#ffffff', fontWeight: '700' },
-      iconBg: '#3fae2a',
-      taglineColor: '#e5e5e5'
-    };
+    return (
+      keywordPages[pathname] ||
+      getExtendedKeywordNavInfo(pathname) || {
+        name: "123MOVIES",
+        tagline: "Watch HD Movies Online Free",
+        logo: { first: "123", second: "MOVIES" },
+        firstStyle: { color: "#3fae2a", fontWeight: "900" },
+        secondStyle: { color: "#ffffff", fontWeight: "700" },
+        iconBg: "#3fae2a",
+        taglineColor: "#e5e5e5",
+      }
+    );
   };
 
   const siteInfo = getSiteInfo();
   const displayName = siteInfo.logo;
+  const usePlayOLogo = siteInfo.name === "123MOVIES";
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,13 +299,16 @@ export default function Navbar() {
           <div className="flex items-center">
             <SiteLogo
               tagline={siteInfo.tagline}
+              taglineColor={siteInfo.taglineColor}
               href="/"
               size="nav"
-              variant="playO"
+              variant={usePlayOLogo ? "playO" : "split"}
               first={displayName.first}
               second={displayName.second}
               firstColor={typeof siteInfo.firstStyle.color === "string" ? siteInfo.firstStyle.color : undefined}
               secondColor={typeof siteInfo.secondStyle.color === "string" ? siteInfo.secondStyle.color : undefined}
+              firstSpanStyle={!usePlayOLogo ? siteInfo.firstStyle : undefined}
+              secondSpanStyle={!usePlayOLogo ? siteInfo.secondStyle : undefined}
             />
           </div>
           
@@ -320,6 +328,12 @@ export default function Navbar() {
               className="text-gray-300 hover:text-white transition-colors font-medium"
             >
               MOVIES
+            </Link>
+            <Link
+              href="/series"
+              className="text-gray-300 hover:text-white transition-colors font-medium"
+            >
+              TV SERIES
             </Link>
             
             {/* Genres Dropdown */}
@@ -590,6 +604,15 @@ export default function Navbar() {
               onClick={() => setIsMenuOpen(false)}
             >
               Movies
+            </Link>
+            <Link
+              href="/series"
+              className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              onClick={() => {
+                setIsMenuOpen(false);
+              }}
+            >
+              TV Series
             </Link>
             <Link 
               href="/country" 

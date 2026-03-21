@@ -83,7 +83,14 @@ export default function TVNavbar() {
             </Link>
             
             <Link href="/series" className="text-gray-300 hover:text-white transition-colors font-medium">
-              ALL SERIES
+              TV SERIES
+            </Link>
+
+            <Link
+              href="/movies"
+              className="text-gray-300 hover:text-white transition-colors font-medium"
+            >
+              MOVIES
             </Link>
             
             {/* TV Genres Dropdown */}
@@ -233,6 +240,22 @@ export default function TVNavbar() {
               }}
             >
               Home
+            </Link>
+            <Link 
+              href="/series" 
+              className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              TV Series
+            </Link>
+            <Link 
+              href="/movies" 
+              className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              onClick={() => {
+                setIsMenuOpen(false);
+              }}
+            >
+              Movies
             </Link>
             <Link 
               href="/tv-genre/all" 

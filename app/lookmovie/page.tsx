@@ -1,4 +1,4 @@
-import LandingVariant8 from "../components/LandingVariant8";
+import LookmovieStyleLanding from "../components/keyword-landings/LookmovieStyleLanding";
 import type { Metadata } from "next";
 import { getCanonicalBase } from "@/lib/domain";
 
@@ -72,7 +72,7 @@ const colorTheme = {
 
 export default function LookmoviePage() {
   return (
-    <LandingVariant8
+    <LookmovieStyleLanding
       keyword="Lookmovie"
       description="Look and Stream - Entertainment Made Easy"
       colorTheme={colorTheme}

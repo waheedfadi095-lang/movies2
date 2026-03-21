@@ -1,0 +1,6 @@
+{
+  "_comment": "Rename to official-refs.json. Only add URLs you are allowed to capture. Run: set MODE=official && node scripts/capture-landing-screenshots.mjs",
+  "fmovies": { "url": "" },
+  "gomovies": { "url": "" },
+  "hurawatch": { "url": "" }
+}

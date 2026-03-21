@@ -1,4 +1,4 @@
-import LandingVariant5 from "../components/LandingVariant5";
+import YesmoviesStyleLanding from "../components/keyword-landings/YesmoviesStyleLanding";
 import type { Metadata } from "next";
 import { getCanonicalBase } from "@/lib/domain";
 
@@ -72,7 +72,7 @@ const colorTheme = {
 
 export default function YesmoviesPage() {
   return (
-    <LandingVariant5
+    <YesmoviesStyleLanding
       keyword="Yesmovies"
       description="Say Yes to Free Entertainment"
       colorTheme={colorTheme}

@@ -1,4 +1,4 @@
-import LandingVariant7 from "../components/LandingVariant7";
+import PopcornflixStyleLanding from "../components/keyword-landings/PopcornflixStyleLanding";
 import type { Metadata } from "next";
 import { getCanonicalBase } from "@/lib/domain";
 
@@ -72,7 +72,7 @@ const colorTheme = {
 
 export default function PopcornflixPage() {
   return (
-    <LandingVariant7
+    <PopcornflixStyleLanding
       keyword="Popcornflix"
       description="Pop Some Corn and Start Streaming"
       colorTheme={colorTheme}
