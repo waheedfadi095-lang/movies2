@@ -40,7 +40,16 @@ export type MovieListItem = {
   backdrop_path?: string | null;
 };
 
-export async function getMovieByImdbId(imdbId: string): Promise<Movie | null> {
+export type GetMovieByImdbOptions = {
+  /** If true, return movie even when TMDB has no poster (home grids use placeholder). Default false. */
+  allowMissingPoster?: boolean;
+};
+
+export async function getMovieByImdbId(
+  imdbId: string,
+  options?: GetMovieByImdbOptions
+): Promise<Movie | null> {
+  const allowMissingPoster = Boolean(options?.allowMissingPoster);
   try {
     // First, find the TMDB ID using the IMDB ID
     const findUrl = `${TMDB_BASE_URL}/find/${imdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
@@ -81,8 +90,7 @@ export async function getMovieByImdbId(imdbId: string): Promise<Movie | null> {
       revenue: movieData.revenue,
     };
     
-    // Only return movies that have at least a poster image
-    if (!movie.poster_path || movie.poster_path.trim() === '') {
+    if (!allowMissingPoster && (!movie.poster_path || movie.poster_path.trim() === '')) {
       console.log('Skipping movie without poster:', movieData.title);
       return null;
     }
@@ -222,18 +230,20 @@ export async function getSimilarMovies(movieId: number): Promise<MovieListItem[]
 }
 
 // Fetch data from multiple IMDB IDs
-export async function getMoviesByMultipleImdbIds(imdbIds: string[]): Promise<Movie[]> {
+export async function getMoviesByMultipleImdbIds(
+  imdbIds: string[],
+  options?: GetMovieByImdbOptions
+): Promise<Movie[]> {
   try {
-    // Use Promise.all to fetch multiple movies in parallel
-    const moviesPromises = imdbIds.map(imdbId => getMovieByImdbId(imdbId));
+    const moviesPromises = imdbIds.map((imdbId) => getMovieByImdbId(imdbId, options));
     const movies = await Promise.all(moviesPromises);
-    
-    // Filter out any null results and movies without images
-    const validMovies = movies.filter((movie): movie is Movie => 
-      movie !== null && 
-      typeof movie.poster_path === 'string' && 
-      movie.poster_path.trim() !== ''
-    );
+
+    const allowMissingPoster = Boolean(options?.allowMissingPoster);
+    const validMovies = movies.filter((movie): movie is Movie => {
+      if (movie === null) return false;
+      if (allowMissingPoster) return true;
+      return typeof movie.poster_path === "string" && movie.poster_path.trim() !== "";
+    });
     
     console.log(`Filtered ${movies.length} movies down to ${validMovies.length} with images`);
     return validMovies;
@@ -271,10 +281,20 @@ export async function getMovieVideos(movieId: number): Promise<Video[]> {
   }
 }
 
-// Search movies by title using TMDB API
+// Search movies by title. In browser, use local dataset API first.
 export async function searchMoviesByTitle(searchTerm: string, limit: number = 20): Promise<MovieListItem[]> {
   try {
-    console.log('TMDB searchMoviesByTitle called with:', searchTerm, limit);
+    if (typeof window !== "undefined") {
+      const localRes = await fetch(
+        `/api/tmdb-search-movies?q=${encodeURIComponent(searchTerm)}&page=1&limit=${limit}`
+      );
+      const localJson = await localRes.json();
+      if (localRes.ok && localJson?.success && Array.isArray(localJson.data)) {
+        return localJson.data as MovieListItem[];
+      }
+    }
+
+    console.log('TMDB fallback searchMoviesByTitle called with:', searchTerm, limit);
     const url = `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(searchTerm)}&page=1`;
     const response = await fetch(url);
     const data = await response.json();

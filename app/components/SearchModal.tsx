@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { getYear, searchMoviesByTitle } from "@/api/tmdb";
+import { getYear } from "@/api/tmdb";
 import type { Movie } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import { resolvePosterUrl } from "@/lib/poster";
@@ -18,73 +18,74 @@ export default function SearchModal({ isOpen, onClose, searchType = 'movies' }: 
   const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const router = useRouter();
+  const LIMIT = 8;
 
   useEffect(() => {
     if (isOpen) {
       setSearchTerm("");
       setSuggestions([]);
+      setPage(1);
+      setTotal(0);
+      setPages(0);
+      setHasMore(false);
     }
   }, [isOpen]);
 
+  const fetchSuggestions = async (targetPage: number, append: boolean) => {
+    if (searchTerm.trim().length < 2) {
+      setSuggestions([]);
+      setTotal(0);
+      setPages(0);
+      setHasMore(false);
+      return;
+    }
+
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+    try {
+      if (searchType === "tv") {
+        const response = await fetch(
+          `/api/tv-series-search?q=${encodeURIComponent(searchTerm)}&page=${targetPage}&limit=${LIMIT}&enrich=1`
+        );
+        const result = await response.json();
+        const list = result.success && Array.isArray(result.data) ? result.data : [];
+        setSuggestions((prev) => (append ? [...prev, ...list] : list));
+        const p = result.pagination || {};
+        setPage(p.page || targetPage);
+        setTotal(p.total || list.length);
+        setPages(p.pages || 1);
+        setHasMore(Boolean(p.hasMore));
+      } else {
+        const response = await fetch(
+          `/api/tmdb-search-movies?q=${encodeURIComponent(searchTerm)}&page=${targetPage}&limit=${LIMIT}`
+        );
+        const result = await response.json();
+        const list = result.success && Array.isArray(result.data) ? result.data : [];
+        setSuggestions((prev) => (append ? [...prev, ...list] : list));
+        const p = result.pagination || {};
+        setPage(p.page || targetPage);
+        setTotal(p.total || list.length);
+        setPages(p.pages || 1);
+        setHasMore(Boolean(p.hasMore));
+      }
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
+      if (!append) setSuggestions([]);
+    }
+    setLoading(false);
+    setLoadingMore(false);
+  };
+
   useEffect(() => {
-    const fetchSuggestions = async () => {
-      if (searchTerm.trim().length < 2) {
-        setSuggestions([]);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        console.log('SearchModal: Starting search for:', searchTerm, 'Type:', searchType);
-        
-        if (searchType === 'tv') {
-          // Search TV series from our API
-          const response = await fetch(`/api/tv-series-search?q=${encodeURIComponent(searchTerm)}&limit=20`);
-          const result = await response.json();
-          
-          if (result.success && Array.isArray(result.data)) {
-            setSuggestions(result.data.slice(0, 8));
-          } else {
-            setSuggestions([]);
-          }
-        } else {
-          // Search movies using TMDB
-          const searchResults = await searchMoviesByTitle(searchTerm, 20);
-          
-          // Make sure searchResults is an array
-          if (!Array.isArray(searchResults)) {
-            console.error('SearchModal: searchResults is not an array:', searchResults);
-            setSuggestions([]);
-            return;
-          }
-          
-          // Convert to Movie type for consistency
-          const moviesData = searchResults
-            .filter(movie => movie.imdb_id && movie.imdb_id.trim() !== '') // Only include movies with valid imdb_id
-            .map(movie => ({
-              ...movie,
-              imdb_id: movie.imdb_id!, // We know it exists due to filter
-              overview: '', // Will be filled if needed
-              genres: [], // Will be filled if needed
-              vote_count: 0,
-              popularity: 0,
-              adult: false,
-              original_language: 'en',
-              original_title: movie.title,
-              backdrop_path: movie.backdrop_path || null,
-            }));
-          
-          setSuggestions(moviesData.slice(0, 8)); // Show max 8 suggestions
-        }
-      } catch (error) {
-        console.error('Error fetching suggestions:', error);
-        setSuggestions([]);
-      }
-      setLoading(false);
-    };
-
-    const debounceTimer = setTimeout(fetchSuggestions, 300);
+    const debounceTimer = setTimeout(() => {
+      fetchSuggestions(1, false);
+    }, 300);
     return () => clearTimeout(debounceTimer);
   }, [searchTerm, searchType]);
 
@@ -205,6 +206,20 @@ export default function SearchModal({ isOpen, onClose, searchType = 'movies' }: 
                       </div>
                     </button>
                   ))}
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+                  <span>
+                    Showing {suggestions.length} of {total}
+                  </span>
+                  {hasMore && (
+                    <button
+                      onClick={() => fetchSuggestions(page + 1, true)}
+                      disabled={loadingMore}
+                      className="rounded bg-purple-600 px-3 py-1 font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      {loadingMore ? "Loading..." : `Load More (${page + 1}/${Math.max(1, pages)})`}
+                    </button>
+                  )}
                 </div>
               </div>
             )}

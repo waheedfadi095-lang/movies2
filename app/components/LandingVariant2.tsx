@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { getYear, searchMoviesByTitle } from "@/api/tmdb";
+import { getYear } from "@/api/tmdb";
+import { searchLocalMovies } from "@/lib/searchLocalMovies";
 import type { MovieListItem } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import { resolvePosterUrl } from "@/lib/poster";
@@ -45,7 +46,7 @@ export default function LandingVariant2({ keyword, description, colorTheme, cont
     setShowResults(true);
     
     try {
-      const results = await searchMoviesByTitle(searchTerm.trim(), 20);
+      const results = await searchLocalMovies(searchTerm.trim(), 20, 1);
       if (Array.isArray(results)) {
         const moviesData = results
           .filter(movie => movie.imdb_id && movie.imdb_id.trim() !== '')

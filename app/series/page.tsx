@@ -35,7 +35,7 @@ export default function SeriesListPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const ITEMS_PER_PAGE = 7;
+  const ITEMS_PER_PAGE = 24;
   
   // Fetch series from MongoDB API with pagination
   const fetchSeries = async (skip: number = 0) => {
@@ -46,7 +46,7 @@ export default function SeriesListPage() {
         setLoadingMore(true);
       }
       
-      const response = await fetch(`/api/tv-series-db?limit=${ITEMS_PER_PAGE}&skip=${skip}&sortBy=first_air_date&sortOrder=desc`);
+      const response = await fetch(`/api/tv-series-db?limit=${ITEMS_PER_PAGE}&skip=${skip}&sortBy=first_air_date&sortOrder=desc&enrich=1`);
       const result = await response.json();
       
       if (result.success && result.data) {
@@ -60,7 +60,10 @@ export default function SeriesListPage() {
           first_air_date: series.first_air_date,
           vote_average: series.vote_average || 0,
           number_of_seasons: series.number_of_seasons || series.seasons?.length || 0,
-          episodeCount: series.seasons?.reduce((sum: number, season: any) => sum + season.episodes.length, 0) || 0
+          episodeCount:
+            series.number_of_episodes ||
+            series.seasons?.reduce((sum: number, season: any) => sum + (season?.episodes?.length || 0), 0) ||
+            0
         }));
         
         if (skip === 0) {
@@ -113,7 +116,7 @@ export default function SeriesListPage() {
           <p className="text-gray-400">
             {loading ? 'Loading...' : `Browse ${totalCount.toLocaleString()} TV shows • Showing ${allSeries.length} series`}
           </p>
-          <p className="text-purple-400 text-sm mt-1">📺 New releases first • Load 7 at a time for fast performance</p>
+          <p className="text-purple-400 text-sm mt-1">📺 New releases first • Latest sort by air date</p>
         </div>
 
         {/* Loading State */}
@@ -200,5 +203,6 @@ export default function SeriesListPage() {
     </>
   );
 }
+
 
 

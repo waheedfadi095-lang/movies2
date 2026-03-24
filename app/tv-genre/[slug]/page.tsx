@@ -25,7 +25,7 @@ export default function TVGenrePage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const ITEMS_PER_PAGE = 7;
+  const ITEMS_PER_PAGE = 24;
   
   const genre = getTVGenreBySlug(slug);
   
@@ -39,8 +39,12 @@ export default function TVGenrePage() {
       }
       
       // Use genre filter from API
-      const genreName = genre?.name || '';
-      const response = await fetch(`/api/tv-series-db?limit=${ITEMS_PER_PAGE}&skip=${skip}&sortBy=first_air_date&sortOrder=desc&genre=${encodeURIComponent(genreName)}`);
+      const genreName = genre?.name || "";
+      const response = await fetch(
+        `/api/tv-series-db?limit=${ITEMS_PER_PAGE}&skip=${skip}&sortBy=first_air_date&sortOrder=desc&genre=${encodeURIComponent(
+          genreName
+        )}&genreSlug=${encodeURIComponent(slug)}&enrich=1`
+      );
       const result = await response.json();
       
       if (result.success && result.data) {
@@ -54,7 +58,10 @@ export default function TVGenrePage() {
           first_air_date: series.first_air_date,
           vote_average: series.vote_average || 0,
           number_of_seasons: series.number_of_seasons || series.seasons?.length || 0,
-          episodeCount: series.seasons?.reduce((sum: number, season: any) => sum + season.episodes.length, 0) || 0
+          episodeCount:
+            series.number_of_episodes ||
+            series.seasons?.reduce((sum: number, season: any) => sum + (season?.episodes?.length || 0), 0) ||
+            0
         }));
         
         if (skip === 0) {
@@ -74,14 +81,12 @@ export default function TVGenrePage() {
     }
   };
   
-  // Load initial series
+  // Load initial series (wait for valid genre so we don't list everything)
   useEffect(() => {
+    if (!genre) return;
     fetchSeries(0);
-    
-    if (genre) {
-      document.title = `${genre.name} TV Shows - Watch Online`;
-    }
-  }, [genre]);
+    document.title = `${genre.name} TV Shows - Watch Online`;
+  }, [slug, genre?.name]);
   
   // Load more handler
   const handleLoadMore = () => {

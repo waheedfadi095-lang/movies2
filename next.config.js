@@ -8,6 +8,12 @@ const nextConfig = {
         port: '',
         pathname: '/t/p/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'img.icdn.my.id',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 }

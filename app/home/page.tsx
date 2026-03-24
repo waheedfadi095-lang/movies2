@@ -12,8 +12,9 @@ import type { Movie } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import { getTVImageUrl } from "@/api/tmdb-tv";
 import SiteLogo from "@/components/SiteLogo";
-import referenceHomeMapped from "@/data/referenceHomeMapped.json";
 import { resolvePosterUrl } from "@/lib/poster";
+import { HOME_DISPLAY_TITLES } from "@/data/homeReferenceDisplayTitles";
+type HomeMovieCard = { movie: Movie; displayTitle?: string; source: "mapped" | "fallback" };
 
 // Shared GET cache to avoid duplicate homepage requests.
 const homeRequestCache = new Map<string, { at: number; data: any }>();
@@ -47,41 +48,302 @@ async function fetchCachedJson(url: string, ttlMs: number = HOME_CACHE_TTL_MS) {
   return result;
 }
 
+// --- Reference: titles + order only (layout). Data / links / posters = our app. ---
+
+/** IMDb ids from reference hrefs — used only to seed our `getMoviesByImdbIds` pool (not for external links). */
+function extractImdbIdsInItemOrder(items: any[] | undefined, max: number): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of items || []) {
+    const href = item?.href;
+    const m = typeof href === "string" ? href.match(/(tt\d{6,10})/i) : null;
+    if (!m) continue;
+    const id = m[1];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function normTitleKey(t: string) {
+  return t.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function titleTokens(t: string): string[] {
+  return normTitleKey(t)
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(" ")
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 3);
+}
+
+function isKeywordMatch(movieTitle: string, refTitle: string): boolean {
+  const a = titleTokens(movieTitle);
+  const b = titleTokens(refTitle);
+  if (a.length === 0 || b.length === 0) return false;
+  const aset = new Set(a);
+  let common = 0;
+  for (const w of b) {
+    if (aset.has(w)) common += 1;
+  }
+  return common >= Math.min(2, b.length);
+}
+
+function movieHasGenreId(movie: Movie, genreId: number): boolean {
+  const m = movie as any;
+  const genreIds = Array.isArray(m.genre_ids) ? m.genre_ids : [];
+  if (genreIds.includes(genreId)) return true;
+  const genres = Array.isArray(m.genres) ? m.genres : [];
+  return genres.some((g: any) => Number(g?.id) === genreId);
+}
+
+function fillToMinMovies(
+  movies: Movie[],
+  pool: Movie[],
+  min: number,
+  excludedImdbIds: Set<string> = new Set(),
+  preferredGenreId?: number
+): Movie[] {
+  const seen = new Set([...movies.map((m) => m.imdb_id), ...excludedImdbIds]);
+  const out = [...movies];
+  const orderedPool =
+    preferredGenreId == null
+      ? pool
+      : [
+          ...pool.filter((m) => movieHasGenreId(m, preferredGenreId)),
+          ...pool.filter((m) => !movieHasGenreId(m, preferredGenreId)),
+        ];
+  for (const m of orderedPool) {
+    if (out.length >= min) break;
+    if (seen.has(m.imdb_id)) continue;
+    seen.add(m.imdb_id);
+    out.push(m);
+  }
+  return out.slice(0, min);
+}
+
+function fillToMinTv(items: any[], pool: any[], min: number): any[] {
+  const key = (s: any) => String(s.tmdb_id || s.imdb_id || "");
+  const seen = new Set(items.map(key).filter(Boolean));
+  const out = [...items];
+  for (const s of pool) {
+    if (out.length >= min) break;
+    const k = key(s);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+  }
+  return out.slice(0, min);
+}
+
+function dedupeMoviesByImdb(pool: Movie[]): Movie[] {
+  const seen = new Set<string>();
+  const out: Movie[] = [];
+  for (const m of pool) {
+    if (!m?.imdb_id || seen.has(m.imdb_id)) continue;
+    seen.add(m.imdb_id);
+    out.push(m);
+  }
+  return out;
+}
+
+/** Strip " - Season N" / " Season N" from reference TV labels for matching DB `name`. */
+function baseTvTitleFromRef(refTitle: string): string {
+  return refTitle
+    .replace(/\s*-\s*Season\s*\d+/i, "")
+    .replace(/\s+Season\s*\d+/i, "")
+    .trim();
+}
+
+function tvKeyVariants(refTitle: string): string[] {
+  const full = normTitleKey(refTitle);
+  const base = normTitleKey(baseTvTitleFromRef(refTitle));
+  return [...new Set([full, base])].filter(Boolean);
+}
+
+function pickTvFromPool(refTitle: string, pool: any[], used: Set<string>): any | null {
+  const keys = tvKeyVariants(refTitle);
+  for (const s of pool) {
+    const id = String(s.tmdb_id || s.imdb_id || "");
+    if (!id || used.has(id)) continue;
+    const n = normTitleKey(s.name || "");
+    if (keys.some((k) => k && n === k)) return s;
+  }
+  const baseLabel = baseTvTitleFromRef(refTitle);
+  for (const s of pool) {
+    const id = String(s.tmdb_id || s.imdb_id || "");
+    if (!id || used.has(id)) continue;
+    if (isKeywordMatch(s.name || "", baseLabel)) return s;
+  }
+  return null;
+}
+
+async function resolveTvFromSearch(refTitle: string, used: Set<string>): Promise<any | null> {
+  const q = baseTvTitleFromRef(refTitle);
+  if (q.length < 2) return null;
+  const { ok, data } = await fetchCachedJson(
+    `/api/tv-series-search?q=${encodeURIComponent(q)}&limit=6`
+  );
+  if (!ok || !data?.success || !Array.isArray(data.data)) return null;
+  const want = normTitleKey(q);
+  const candidates = data.data as any[];
+  let s =
+    candidates.find((x) => normTitleKey(x.name || "") === want) ||
+    candidates.find((x) => isKeywordMatch(x.name || "", q)) ||
+    candidates[0];
+  if (!s) return null;
+  const id = String(s.tmdb_id || s.imdb_id || "");
+  if (!id || used.has(id)) return null;
+  return s;
+}
+
+async function buildTvRowFromDisplayTitles(
+  refTitles: string[],
+  tvPool: any[],
+  min: number,
+  maxSearchLookups: number = 0
+): Promise<any[]> {
+  const used = new Set<string>();
+  const out: any[] = [];
+  let lookups = 0;
+  for (const t of refTitles.slice(0, min)) {
+    let s = pickTvFromPool(t, tvPool, used);
+    if (!s && lookups < maxSearchLookups) {
+      lookups += 1;
+      s = await resolveTvFromSearch(t, used);
+    }
+    if (s) {
+      const id = String(s.tmdb_id || s.imdb_id);
+      used.add(id);
+      out.push(s);
+    }
+  }
+  return fillToMinTv(out, tvPool, min);
+}
+
+async function buildOrderedMovieCardsFromTitles(
+  titles: string[],
+  pool: Movie[],
+  min: number,
+  blockedFromOutput: Set<string>
+): Promise<HomeMovieCard[]> {
+  const out: Movie[] = [];
+  const displayByImdb = new Map<string, string>();
+  const blocked = new Set(blockedFromOutput);
+  for (const t of titles.slice(0, min)) {
+    let m = pool.find(
+      (x) => x.imdb_id && !blocked.has(x.imdb_id) && normTitleKey(x.title || "") === normTitleKey(t)
+    );
+    if (!m) {
+      m = pool.find(
+        (x) => x.imdb_id && !blocked.has(x.imdb_id) && isKeywordMatch(x.title || "", t)
+      );
+    }
+    if (m) {
+      out.push(m);
+      blocked.add(m.imdb_id);
+      if (m.imdb_id && !displayByImdb.has(m.imdb_id)) {
+        displayByImdb.set(m.imdb_id, t);
+      }
+    }
+  }
+  const filled = fillToMinMovies(out, pool, min, blockedFromOutput, 12);
+  const mappedIds = new Set(out.map((m) => m.imdb_id).filter(Boolean));
+  return filled.map((movie) => ({
+    movie,
+    displayTitle: displayByImdb.get(movie.imdb_id),
+    source: mappedIds.has(movie.imdb_id) ? "mapped" : "fallback",
+  }));
+}
+
+/** When batch JSON pools are empty, fill from VidSrc IMDB list + TMDB (posters optional). */
+async function hydratePoolFromVidSrcList(maxIds: number): Promise<Movie[]> {
+  const { ok, data } = await fetchCachedJson(
+    `/api/movies/list?offset=0&limit=${Math.min(500, maxIds * 4)}&order=desc`
+  );
+  if (!ok || !Array.isArray(data?.imdb_ids) || data.imdb_ids.length === 0) return [];
+  const ids = (data.imdb_ids as string[]).slice(0, maxIds).filter(Boolean);
+  if (!ids.length) return [];
+  return getMoviesByImdbIds(ids, { allowMissingPoster: true });
+}
+
+/** Movie poster: only TMDB / our poster_path (no external hotlink). */
+function getMovieCardPoster(movie: Movie): string {
+  return resolvePosterUrl(movie.poster_path, "w500");
+}
+
+/** TV poster: TMDB image host or placeholder (no third-party CDN on cards). */
+function getTvCardPoster(posterPath: string | null | undefined): string {
+  if (!posterPath?.trim()) return "/placeholder.svg";
+  const p = posterPath.trim();
+  if (p.startsWith("http://") || p.startsWith("https://")) {
+    return p.includes("image.tmdb.org") ? p : "/placeholder.svg";
+  }
+  return getTVImageUrl(p, "w500");
+}
+
 // TV Search Modal Component
 function TVSearchModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const LIMIT = 10;
 
   useEffect(() => {
     if (isOpen) {
       setSearchTerm("");
       setSuggestions([]);
+      setPage(1);
+      setTotal(0);
+      setPages(0);
+      setHasMore(false);
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    const fetchSuggestions = async () => {
-      if (searchTerm.trim().length < 2) {
+  const fetchSuggestions = async (targetPage: number, append: boolean) => {
+    if (searchTerm.trim().length < 2) {
+      setSuggestions([]);
+      setTotal(0);
+      setPages(0);
+      setHasMore(false);
+      return;
+    }
+
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+    try {
+      const url = `/api/tv-series-search?q=${encodeURIComponent(searchTerm)}&page=${targetPage}&limit=${LIMIT}&enrich=1`;
+      const { ok, data } = await fetchCachedJson(url, 2 * 60 * 1000);
+      if (ok && data.success && Array.isArray(data.data)) {
+        setSuggestions((prev) => (append ? [...prev, ...data.data] : data.data));
+        const p = data.pagination || {};
+        setPage(p.page || targetPage);
+        setTotal(p.total || data.data.length);
+        setPages(p.pages || 1);
+        setHasMore(Boolean(p.hasMore));
+      } else if (!append) {
         setSuggestions([]);
-        return;
       }
+    } catch (error) {
+      console.error("Error searching TV series:", error);
+      if (!append) setSuggestions([]);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
-      setLoading(true);
-      try {
-        const url = `/api/tv-series-search?q=${encodeURIComponent(searchTerm)}&limit=10`;
-        const { ok, data } = await fetchCachedJson(url, 2 * 60 * 1000);
-        if (ok && data.success && data.data) {
-          setSuggestions(data.data);
-        }
-      } catch (error) {
-        console.error('Error searching TV series:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const timeoutId = setTimeout(fetchSuggestions, 300);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchSuggestions(1, false);
+    }, 300);
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
@@ -155,6 +417,20 @@ function TVSearchModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
                 </div>
               </button>
             ))}
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+              <span>
+                Showing {suggestions.length} of {total}
+              </span>
+              {hasMore && (
+                <button
+                  onClick={() => fetchSuggestions(page + 1, true)}
+                  disabled={loadingMore}
+                  className="rounded bg-purple-600 px-3 py-1 font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
+                >
+                  {loadingMore ? "Loading..." : `Load More (${page + 1}/${Math.max(1, pages)})`}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -171,36 +447,32 @@ function TVSearchModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
 // TV Series Display Component - Lazy Loading for Categories
 function TVSeriesDisplay({ activeCategory, categoryConfig }: { activeCategory: string, categoryConfig: any[] }) {
   const [displayCount, setDisplayCount] = useState(7); // Load only 7 initially
-  const [categorySeries, setCategorySeries] = useState<any[]>([]);
+  const [categorySeriesByName, setCategorySeriesByName] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(false);
-  const [loadedCategories, setLoadedCategories] = useState<Set<string>>(new Set());
   
   // Load series data for specific category (lazy loading)
   useEffect(() => {
     // If category already loaded, don't reload
-    if (loadedCategories.has(activeCategory)) {
+    if (categorySeriesByName[activeCategory]) {
       return;
     }
     
     setLoading(true);
     
-    // Determine sort order and filters based on category
+    // Determine filters per category, but keep latest-first ordering everywhere.
     let sortBy = 'first_air_date';
     let sortOrder = 'desc';
     let additionalFilters = '';
     
     if (activeCategory === 'Popular') {
-      sortBy = 'vote_average';
-      sortOrder = 'desc';
-      additionalFilters = '&minRating=7.0'; // Only high-rated shows
+      // Strongly separate from Featured so rows are not near-identical.
+      additionalFilters = '&minRating=6.5&maxRating=8.4&minYear=2018';
     } else if (activeCategory === 'Featured') {
-      sortBy = 'vote_average';
-      sortOrder = 'desc';
-      additionalFilters = '&minRating=8.0'; // Only top-rated shows
+      additionalFilters = '&minRating=8.5&minYear=2015';
     } else if (activeCategory === 'Classic Shows') {
       sortBy = 'first_air_date';
-      sortOrder = 'asc';
-      additionalFilters = '&maxYear=2010'; // Shows before 2010
+      sortOrder = 'desc';
+      additionalFilters = '&maxYear=2010'; // latest titles inside classic window
     } else if (activeCategory === 'Trending') {
       sortBy = 'first_air_date';
       sortOrder = 'desc';
@@ -225,12 +497,14 @@ function TVSeriesDisplay({ activeCategory, categoryConfig }: { activeCategory: s
           overview: data.overview,
           firstAirDate: data.first_air_date,
           voteAverage: data.vote_average || 0,
-            episodeCount: data.seasons?.reduce((sum: number, season: any) => sum + season.episodes.length, 0) || 0,
+            episodeCount:
+              data.number_of_episodes ||
+              data.seasons?.reduce((sum: number, season: any) => sum + (season?.episodes?.length || 0), 0) ||
+              0,
           numberOfSeasons: data.number_of_seasons || data.seasons?.length || 0
         }));
       
-          setCategorySeries(seriesData);
-          setLoadedCategories(prev => new Set([...prev, activeCategory]));
+          setCategorySeriesByName((prev) => ({ ...prev, [activeCategory]: seriesData }));
         }
       setLoading(false);
       })
@@ -238,7 +512,7 @@ function TVSeriesDisplay({ activeCategory, categoryConfig }: { activeCategory: s
       console.error('Error loading TV series data:', error);
       setLoading(false);
     });
-  }, [activeCategory, loadedCategories]);
+  }, [activeCategory, categorySeriesByName]);
   
   // Reset display count when category changes
   useEffect(() => {
@@ -246,6 +520,7 @@ function TVSeriesDisplay({ activeCategory, categoryConfig }: { activeCategory: s
   }, [activeCategory]);
   
   // Get series for current category (from loaded data)
+  const categorySeries = categorySeriesByName[activeCategory] || [];
   const displaySeries = categorySeries.slice(0, displayCount);
 
   if (loading) {
@@ -356,23 +631,30 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("Suggestions");
   const [allMovies, setAllMovies] = useState<Movie[]>([]);
+  /** Homepage movies: our API/TMDB; reference only supplies title order. */
+  const [homeSuggestionMovies, setHomeSuggestionMovies] = useState<HomeMovieCard[]>([]);
+  const [homeLatestMovies, setHomeLatestMovies] = useState<HomeMovieCard[]>([]);
+  /** Latest TV row on movies home — always `/api/tv-series-db` (+ optional reorder by ref titles). */
+  const [homeLatestTvSeries, setHomeLatestTvSeries] = useState<any[]>([]);
+  const [suggestionsReady, setSuggestionsReady] = useState(false);
+  const [latestMoviesReady, setLatestMoviesReady] = useState(false);
+  const [latestTvReady, setLatestTvReady] = useState(false);
   const [movieDisplayCount, setMovieDisplayCount] = useState(14); // Load 14 movies at a time
   const [latestMovies, setLatestMovies] = useState<Movie[]>([]);
   const [latestTvSeries, setLatestTvSeries] = useState<any[]>([]);
   const [popularTvSeries, setPopularTvSeries] = useState<any[]>([]);
   const [featuredTvSeries, setFeaturedTvSeries] = useState<any[]>([]);
-  const [referencePostersByTitle, setReferencePostersByTitle] = useState<Record<string, string>>({});
+  const [tvHomeLoading, setTvHomeLoading] = useState(false);
   const [itemsPerRow, setItemsPerRow] = useState(12);
-  const DISPLAY_COUNT = 12;
+  const DISPLAY_COUNT = 16;
   const homeGridClass =
-    "grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6 gap-4";
+    "grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4";
   
   // Mode switching state - Default to MOVIES
   const [currentMode, setCurrentMode] = useState<'movies' | 'tv'>('movies');
   
   // TV Search Modal state
   const [isTVSearchOpen, setIsTVSearchOpen] = useState(false);
-  const didInitLoadRef = useRef(false);
   const didInitSectionsRef = useRef(false);
   const didLoadTvSectionsRef = useRef(false);
   
@@ -407,21 +689,6 @@ export default function HomePage() {
   ];
 
   const categoryConfig = currentMode === 'movies' ? movieCategoryConfig : tvCategoryConfig;
-  const normalizeTitle = (title: string) => title.trim().toLowerCase();
-  const getMoviePosterSrc = (movie: Movie) => {
-    const refPoster = referencePostersByTitle[normalizeTitle(movie.title)];
-    return resolvePosterUrl(movie.poster_path, "w500", refPoster);
-  };
-
-  useEffect(() => {
-    if (didInitLoadRef.current) return;
-    didInitLoadRef.current = true;
-    loadAllCategories();
-    
-    // Auto-refresh disabled for better performance
-    // const interval = setInterval(loadAllCategories, 60000);
-    // return () => clearInterval(interval);
-  }, []);
 
   // Keep homepage sections to exactly 2 rows like reference site.
   // We approximate columns by viewport width.
@@ -441,62 +708,181 @@ export default function HomePage() {
     return () => window.removeEventListener("resize", apply);
   }, []);
 
-  // Load "Latest Movies" and "Latest TV-Series" sections like reference site
+  // Reference: titles/order only. Movies: getMoviesByImdbIds + reorder + fill. TV row (movies home): tv-series-db + reorder.
   useEffect(() => {
     if (didInitSectionsRef.current) return;
     didInitSectionsRef.current = true;
+    const limit = DISPLAY_COUNT;
+    const initialMoviePoolLimit = Math.min(32, Math.max(24, limit * 2));
     (async () => {
       try {
-        const { ok: refHomeOk, data: refHomeData } = await fetchCachedJson(`/api/reference/home`);
-        if (refHomeOk) {
-          const allRefItems = [
-            ...(Array.isArray(refHomeData?.suggestions) ? refHomeData.suggestions : []),
-            ...(Array.isArray(refHomeData?.latestMovies) ? refHomeData.latestMovies : []),
-          ];
-          const posterMap: Record<string, string> = {};
-          for (const item of allRefItems) {
-            if (!item?.title || !item?.poster) continue;
-            posterMap[normalizeTitle(item.title)] = item.poster;
-          }
-          setReferencePostersByTitle(posterMap);
+        // Stage 1: must-have minimum data only (fast first paint).
+        const refRes = await fetchCachedJson(`/api/reference/home`);
+        const mappedRes = await fetchCachedJson(`/api/reference/home-mapped`);
+        const suggestPoolRes = await fetchCachedJson(
+          `/api/movies/latest?category=suggestions&limit=${limit}`
+        );
+
+        const suggestPool: Movie[] =
+          suggestPoolRes.ok && Array.isArray(suggestPoolRes.data?.movies) ? suggestPoolRes.data.movies : [];
+        let latestPool: Movie[] = [];
+        let topPool: Movie[] = [];
+        let tvPool: any[] = [];
+
+        // Canonical row order = your static lists (reference layout guide).
+        const refSuggestTitles = [...HOME_DISPLAY_TITLES.suggestions].slice(0, limit);
+        const refLatestTitles = [...HOME_DISPLAY_TITLES.latestMovies].slice(0, limit);
+        const refTvTitles = [...HOME_DISPLAY_TITLES.latestTvSeries].slice(0, limit);
+
+        const mappedSuggestIds =
+          mappedRes.ok && Array.isArray(mappedRes.data?.suggestionsImdbIds)
+            ? mappedRes.data.suggestionsImdbIds.slice(0, limit * 3)
+            : [];
+        const mappedLatestIds =
+          mappedRes.ok && Array.isArray(mappedRes.data?.latestMoviesImdbIds)
+            ? mappedRes.data.latestMoviesImdbIds.slice(0, limit * 3)
+            : [];
+        const refSuggIds =
+          mappedSuggestIds.length > 0
+            ? mappedSuggestIds
+            : refRes.ok && refRes.data
+              ? extractImdbIdsInItemOrder(refRes.data.suggestions, limit * 3)
+              : [];
+        const refLatestIds =
+          mappedLatestIds.length > 0
+            ? mappedLatestIds
+            : refRes.ok && refRes.data
+              ? extractImdbIdsInItemOrder(refRes.data.latestMovies, limit * 3)
+              : [];
+        const refIdUnion = [...new Set([...refSuggIds, ...refLatestIds])];
+        const refMovies = refIdUnion.length
+          ? await getMoviesByImdbIds(refIdUnion, { allowMissingPoster: true })
+          : [];
+
+        let moviePoolDeduped = dedupeMoviesByImdb([...refMovies, ...suggestPool]);
+
+        // Minimal fallback just for Suggestions first paint.
+        if (moviePoolDeduped.length < Math.min(24, limit * 2)) {
+          const viaList = await hydratePoolFromVidSrcList(Math.max(40, limit * 3));
+          moviePoolDeduped = dedupeMoviesByImdb([...moviePoolDeduped, ...viaList]);
         }
+
+        let suggMovies = await buildOrderedMovieCardsFromTitles(
+          refSuggestTitles,
+          moviePoolDeduped,
+          limit,
+          new Set(),
+          0
+        );
+        if (suggMovies.length === 0 && moviePoolDeduped.length > 0) {
+          suggMovies = fillToMinMovies([], moviePoolDeduped, limit, new Set(), 12).map((movie) => ({
+            movie,
+            source: "fallback" as const,
+          }));
+        }
+        setHomeSuggestionMovies(suggMovies);
+        setSuggestionsReady(true);
+        setLoading(false);
+
+        // Stage 2: Latest Movies (sequential after Suggestions ready)
+        const [latestPoolRes, topPoolRes] = await Promise.all([
+          fetchCachedJson(`/api/movies/latest?category=latest&limit=${initialMoviePoolLimit}`),
+          fetchCachedJson(`/api/movies/latest?category=top_rated&limit=${initialMoviePoolLimit}`),
+        ]);
+        latestPool =
+          latestPoolRes.ok && Array.isArray(latestPoolRes.data?.movies) ? latestPoolRes.data.movies : [];
+        topPool = topPoolRes.ok && Array.isArray(topPoolRes.data?.movies) ? topPoolRes.data.movies : [];
+        moviePoolDeduped = dedupeMoviesByImdb([...moviePoolDeduped, ...latestPool, ...topPool]);
+
+        const usedInSuggestions = new Set(
+          suggMovies.map((c) => c.movie.imdb_id).filter((id): id is string => Boolean(id))
+        );
+        let latestM = await buildOrderedMovieCardsFromTitles(
+          refLatestTitles,
+          moviePoolDeduped,
+          limit,
+          usedInSuggestions,
+          0
+        );
+        if (latestM.length === 0 && moviePoolDeduped.length > 0) {
+          latestM = fillToMinMovies([], moviePoolDeduped, limit, usedInSuggestions, 12).map((movie) => ({
+            movie,
+            source: "fallback" as const,
+          }));
+        }
+        setHomeLatestMovies(latestM);
+        setLatestMoviesReady(true);
+
+        // Stage 3: Latest TV-Series (sequential after Latest Movies)
+        const tvDbRes = await fetchCachedJson(
+          `/api/tv-series-db?limit=80&skip=0&sortBy=first_air_date&sortOrder=desc`
+        );
+        tvPool =
+          tvDbRes.ok && tvDbRes.data?.success && Array.isArray(tvDbRes.data?.data) ? tvDbRes.data.data : [];
+        let tvRow = await buildTvRowFromDisplayTitles(refTvTitles, tvPool, limit, 0);
+        if (tvRow.length === 0) {
+          const tvFb = await fetchCachedJson(
+            `/api/tv-series-db?limit=${limit}&skip=0&sortBy=first_air_date&sortOrder=desc`
+          );
+          const raw =
+            tvFb.ok && tvFb.data?.success && Array.isArray(tvFb.data?.data) ? tvFb.data.data : [];
+          tvRow = fillToMinTv([], raw, limit);
+        }
+        setHomeLatestTvSeries(tvRow);
+        setLatestTvReady(true);
       } catch (error) {
-        console.error("Failed to load reference posters:", error);
-      }
-
-      // Use locally saved mapped IDs (no repeated search/scrape).
-      try {
-        const suggestionsIds = (referenceHomeMapped.suggestionsImdbIds || []).slice(0, DISPLAY_COUNT);
-        const latestIds = (referenceHomeMapped.latestMoviesImdbIds || []).slice(0, DISPLAY_COUNT);
-
-        if (suggestionsIds.length > 0) {
-          const mappedSuggestions = await getMoviesByImdbIds(suggestionsIds);
-          if (mappedSuggestions.length > 0) {
-            setAllMovies(mappedSuggestions);
-            setCategories((prev) => ({ ...prev, Suggestions: mappedSuggestions }));
+        console.error("Homepage sections (ref order + our data):", error);
+        try {
+          const [suggestionsRes, latestRes, tvDbRes] = await Promise.all([
+            fetchCachedJson(`/api/movies/latest?category=suggestions&limit=${limit}`),
+            fetchCachedJson(`/api/movies/latest?category=latest&limit=${limit}`),
+            fetchCachedJson(
+              `/api/tv-series-db?limit=${limit}&skip=0&sortBy=first_air_date&sortOrder=desc`
+            ),
+          ]);
+          if (suggestionsRes.ok && Array.isArray(suggestionsRes.data?.movies)) {
+            const s = fillToMinMovies(suggestionsRes.data.movies, suggestionsRes.data.movies, limit, new Set(), 12)
+              .map((movie) => ({ movie, source: "fallback" as const }));
+            setHomeSuggestionMovies(s);
+            setSuggestionsReady(true);
           }
-        }
-
-        if (latestIds.length > 0) {
-          const mappedLatest = await getMoviesByImdbIds(latestIds);
-          if (mappedLatest.length > 0) {
-            setLatestMovies(mappedLatest);
+          if (latestRes.ok && Array.isArray(latestRes.data?.movies)) {
+            const used = new Set<string>(
+              (suggestionsRes.ok && Array.isArray(suggestionsRes.data?.movies)
+                ? suggestionsRes.data.movies
+                : []
+              )
+                .slice(0, limit)
+                .map((m: Movie) => m.imdb_id)
+                .filter((id: string | undefined): id is string => Boolean(id))
+            );
+            const l = fillToMinMovies(latestRes.data.movies, latestRes.data.movies, limit, used, 12)
+              .map((movie) => ({ movie, source: "fallback" as const }));
+            setHomeLatestMovies(l);
+            setLatestMoviesReady(true);
           }
+          if (tvDbRes.ok && tvDbRes.data?.success && Array.isArray(tvDbRes.data?.data)) {
+            setHomeLatestTvSeries(tvDbRes.data.data.slice(0, limit));
+            setLatestTvReady(true);
+          }
+        } catch (e2) {
+          console.error("Homepage fallback failed:", e2);
         }
-      } catch (error) {
-        console.error("Failed to load local reference mapped movies:", error);
+      } finally {
+        setSuggestionsReady(true);
+        setLatestMoviesReady(true);
+        setLatestTvReady(true);
       }
-
     })();
-  }, []);
+  }, [DISPLAY_COUNT]);
 
-  // Load TV homepage sections only when user switches to TV mode.
+  // Load TV homepage sections once so movie + tv mode latest list stays consistent.
   useEffect(() => {
-    if (currentMode !== "tv") return;
     if (didLoadTvSectionsRef.current) return;
     didLoadTvSectionsRef.current = true;
 
     (async () => {
+      setTvHomeLoading(true);
       const [tvSectionsRes] = await Promise.allSettled([
         fetchCachedJson(`/api/tv-series/home-sections?limit=${DISPLAY_COUNT}`),
       ]);
@@ -507,12 +893,27 @@ export default function HomePage() {
         tvSectionsRes.value.data?.success
       ) {
         const sections = tvSectionsRes.value.data.sections || {};
-        if (Array.isArray(sections.latest)) setLatestTvSeries(sections.latest);
-        if (Array.isArray(sections.popular)) setPopularTvSeries(sections.popular);
-        if (Array.isArray(sections.featured)) setFeaturedTvSeries(sections.featured);
+        if (Array.isArray(sections.latest) && sections.latest.length > 0) {
+          setLatestTvSeries(sections.latest);
+        }
+        if (Array.isArray(sections.popular) && sections.popular.length > 0) {
+          setPopularTvSeries(sections.popular);
+        } else {
+          setPopularTvSeries([]);
+        }
+        if (Array.isArray(sections.featured) && sections.featured.length > 0) {
+          setFeaturedTvSeries(sections.featured);
+        } else {
+          setFeaturedTvSeries([]);
+        }
+      } else {
+        setLatestTvSeries([]);
+        setPopularTvSeries([]);
+        setFeaturedTvSeries([]);
       }
+      setTvHomeLoading(false);
     })();
-  }, [currentMode, DISPLAY_COUNT]);
+  }, [DISPLAY_COUNT]);
 
   // Mode switching functions
   const switchToMovies = () => {
@@ -545,9 +946,8 @@ export default function HomePage() {
       setLoading(false);
 
       // 2) Background: load other movie sections.
-      const [latestRes, topRatedRes] = await Promise.allSettled([
+      const [latestRes] = await Promise.allSettled([
         fetchCachedJson(`/api/movies/latest?category=latest&limit=${DISPLAY_COUNT}`),
-        fetchCachedJson(`/api/movies/latest?category=top_rated&limit=${DISPLAY_COUNT}`),
       ]);
 
       if (
@@ -558,13 +958,6 @@ export default function HomePage() {
         setLatestMovies(latestRes.value.data.movies);
       }
 
-      if (
-        topRatedRes.status === "fulfilled" &&
-        topRatedRes.value.ok &&
-        Array.isArray(topRatedRes.value.data?.movies)
-      ) {
-        setCategories((prev) => ({ ...prev, "Top Rated": topRatedRes.value.data.movies }));
-      }
     } catch (error) {
       console.error('Error loading categories progressively:', error);
       setLoading(false);
@@ -741,7 +1134,7 @@ export default function HomePage() {
                     Suggestions
                   </div>
                 </div>
-                {loading ? (
+                {!suggestionsReady ? (
                   <div className={homeGridClass}>
                     {Array.from({ length: DISPLAY_COUNT }).map((_, i) => (
                       <div key={i} className="bg-white rounded shadow overflow-hidden">
@@ -752,19 +1145,19 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <div className={homeGridClass}>
-                    {allMovies.slice(0, DISPLAY_COUNT).map((movie, index) => (
+                    {homeSuggestionMovies.slice(0, DISPLAY_COUNT).map((card, index: number) => (
                       <Link
-                        key={`${movie.imdb_id}-${index}`}
-                        href={generateMovieUrl(movie.title, movie.imdb_id)}
+                        key={`${card.movie.imdb_id}-${index}`}
+                        href={generateMovieUrl(card.movie.title, card.movie.imdb_id)}
                         className="group block"
                       >
                         <div className="bg-white rounded shadow overflow-hidden">
                           <div className="relative aspect-[2/3]">
-                            <Image
-                              src={getMoviePosterSrc(movie)}
-                              alt={movie.title}
-                              fill
-                              className="object-cover"
+                            <img
+                              src={getMovieCardPoster(card.movie)}
+                              alt={card.displayTitle || card.movie.title}
+                              loading="lazy"
+                              className="absolute inset-0 h-full w-full object-cover"
                             />
                             <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                               HD
@@ -772,7 +1165,7 @@ export default function HomePage() {
                           </div>
                           <div className="bg-black px-2 py-2">
                             <div className="text-white text-xs font-semibold line-clamp-1">
-                              {movie.title}
+                              {card.displayTitle || card.movie.title}
                             </div>
                           </div>
                         </div>
@@ -789,20 +1182,30 @@ export default function HomePage() {
                     Latest Movies
                   </div>
                 </div>
-                <div className={homeGridClass}>
-                  {(latestMovies || []).slice(0, DISPLAY_COUNT).map((movie: any, index: number) => (
+                {!latestMoviesReady ? (
+                  <div className={homeGridClass}>
+                    {Array.from({ length: DISPLAY_COUNT }).map((_, i) => (
+                      <div key={`latest-m-skel-${i}`} className="bg-white rounded shadow overflow-hidden">
+                        <div className="aspect-[2/3] bg-gray-200 animate-pulse" />
+                        <div className="h-8 bg-black/80" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={homeGridClass}>
+                    {homeLatestMovies.slice(0, DISPLAY_COUNT).map((card, index: number) => (
                     <Link
-                      key={`latest-m-${movie.imdb_id ?? index}-${index}`}
-                      href={generateMovieUrl(movie.title, movie.imdb_id)}
+                      key={`latest-m-${card.movie.imdb_id ?? index}-${index}`}
+                      href={generateMovieUrl(card.movie.title, card.movie.imdb_id)}
                       className="group block"
                     >
                       <div className="bg-white rounded shadow overflow-hidden">
                         <div className="relative aspect-[2/3]">
-                          <Image
-                            src={getMoviePosterSrc(movie)}
-                            alt={movie.title}
-                            fill
-                            className="object-cover"
+                          <img
+                            src={getMovieCardPoster(card.movie)}
+                            alt={card.displayTitle || card.movie.title}
+                            loading="lazy"
+                            className="absolute inset-0 h-full w-full object-cover"
                           />
                           <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                             HD
@@ -810,49 +1213,67 @@ export default function HomePage() {
                         </div>
                         <div className="bg-black px-2 py-2">
                           <div className="text-white text-xs font-semibold line-clamp-1">
-                            {movie.title}
+                            {card.displayTitle || card.movie.title}
                           </div>
                         </div>
                       </div>
                     </Link>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
-              {/* Top Rated (Movies) */}
+              {/* Latest TV-Series */}
               <section>
                 <div className="mb-3">
                   <div className="inline-flex items-center bg-[#79c142] text-white text-base md:text-lg font-bold px-4 py-2 rounded">
-                    Top Rated
+                    Latest TV-Series
                   </div>
                 </div>
                 <div className={homeGridClass}>
-                  {(categories["Top Rated"] || latestMovies).slice(0, DISPLAY_COUNT).map((movie: any, index: number) => (
-                    <Link
-                      key={`top-rated-m-${movie.imdb_id ?? index}-${index}`}
-                      href={generateMovieUrl(movie.title, movie.imdb_id)}
-                      className="group block"
-                    >
-                      <div className="bg-white rounded shadow overflow-hidden">
-                        <div className="relative aspect-[2/3]">
-                          <Image
-                            src={getMoviePosterSrc(movie)}
-                            alt={movie.title}
-                            fill
-                            className="object-cover"
-                          />
-                          <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                            HD
-                          </span>
+                  {!latestTvReady
+                    ? Array.from({ length: DISPLAY_COUNT }).map((_, i) => (
+                        <div key={`tv-m-skel-${i}`} className="bg-white rounded shadow overflow-hidden">
+                          <div className="aspect-[2/3] bg-gray-200 animate-pulse" />
+                          <div className="h-8 bg-black/80" />
                         </div>
-                        <div className="bg-black px-2 py-2">
-                          <div className="text-white text-xs font-semibold line-clamp-1">
-                            {movie.title}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                      ))
+                    : homeLatestTvSeries.slice(0, DISPLAY_COUNT).map((series: any, index: number) => {
+                        const name = series.name || `TV Series ${series.imdb_id || series.tmdb_id || index}`;
+                        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+                        const href = `/${slug}-${series.tmdb_id || series.tmdbId || series.imdb_id || series.imdbId || ""}`;
+                        const eps =
+                          series?.seasons?.reduce?.((sum: number, s: any) => sum + (s?.episodes?.length || 0), 0) ||
+                          series?.episodeCount ||
+                          0;
+                        return (
+                          <Link key={`tv-latest-moviesmode-${series.tmdb_id ?? series.imdb_id ?? index}-${index}`} href={href} className="group block">
+                            <div className="bg-white rounded shadow overflow-hidden">
+                              <div className="relative aspect-[2/3]">
+                                <img
+                                  src={getTvCardPoster(series.poster_path)}
+                                  alt={name}
+                                  loading="lazy"
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                />
+                                <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                                  TV
+                                </span>
+                                {eps > 0 && (
+                                  <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                                    Eps {eps}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="bg-black px-2 py-2">
+                                <div className="text-white text-xs font-semibold line-clamp-1">
+                                  {name}
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
                 </div>
               </section>
             </>
@@ -866,42 +1287,52 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className={homeGridClass}>
-                  {latestTvSeries.slice(0, DISPLAY_COUNT).map((series: any, index: number) => {
-                    const name = series.name || `TV Series ${series.imdb_id || series.tmdb_id || index}`;
-                    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-                    const href = `/${slug}-${series.tmdb_id || series.tmdbId || series.imdb_id || series.imdbId || ""}`;
-                    const eps =
-                      series?.seasons?.reduce?.((sum: number, s: any) => sum + (s?.episodes?.length || 0), 0) ||
-                      series?.episodeCount ||
-                      0;
-                    return (
-                      <Link key={`tv-latest-${series.tmdb_id ?? series.imdb_id ?? index}-${index}`} href={href} className="group block">
-                        <div className="bg-white rounded shadow overflow-hidden">
-                          <div className="relative aspect-[2/3]">
-                            <Image
-                              src={series.poster_path ? getTVImageUrl(series.poster_path, "w500") : "/placeholder.svg"}
-                              alt={name}
-                              fill
-                              className="object-cover"
-                            />
-                            <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                              TV
-                            </span>
-                            {eps > 0 && (
-                              <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                                Eps {eps}
-                              </span>
-                            )}
-                          </div>
-                          <div className="bg-black px-2 py-2">
-                            <div className="text-white text-xs font-semibold line-clamp-1">
-                              {name}
+                  {tvHomeLoading ? (
+                    Array.from({ length: DISPLAY_COUNT }).map((_, i) => (
+                      <div key={`tv-latest-skel-${i}`} className="bg-white rounded shadow overflow-hidden">
+                        <div className="aspect-[2/3] bg-gray-200 animate-pulse" />
+                        <div className="h-8 bg-black/80" />
+                      </div>
+                    ))
+                  ) : (
+                    latestTvSeries.slice(0, DISPLAY_COUNT).map((series: any, index: number) => {
+                        const name = series.name || `TV Series ${series.imdb_id || series.tmdb_id || index}`;
+                        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+                        const href = `/${slug}-${series.tmdb_id || series.tmdbId || series.imdb_id || series.imdbId || ""}`;
+                        const eps =
+                          series?.seasons?.reduce?.((sum: number, s: any) => sum + (s?.episodes?.length || 0), 0) ||
+                          series?.episodeCount ||
+                          0;
+                        return (
+                          <Link key={`tv-latest-${series.tmdb_id ?? series.imdb_id ?? index}-${index}`} href={href} className="group block">
+                            <div className="bg-white rounded shadow overflow-hidden">
+                              <div className="relative aspect-[2/3]">
+                                <img
+                                  src={getTvCardPoster(series.poster_path)}
+                                  alt={name}
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                />
+                                <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                                  TV
+                                </span>
+                                {eps > 0 && (
+                                  <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                                    Eps {eps}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="bg-black px-2 py-2">
+                                <div className="text-white text-xs font-semibold line-clamp-1">
+                                  {name}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                          </Link>
+                        );
+                      })
+                  )}
                 </div>
               </section>
 
@@ -913,7 +1344,12 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className={homeGridClass}>
-                  {popularTvSeries.slice(0, DISPLAY_COUNT).map((series: any, index: number) => {
+                  {popularTvSeries.length === 0 && !tvHomeLoading ? (
+                    <div className="col-span-full rounded bg-white px-4 py-8 text-center text-gray-600">
+                      Popular TV-Series abhi load nahi hui, refresh karke check karein.
+                    </div>
+                  ) : (
+                    popularTvSeries.slice(0, DISPLAY_COUNT).map((series: any, index: number) => {
                     const name = series.name || `TV Series ${series.imdb_id || series.tmdb_id || index}`;
                     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
                     const href = `/${slug}-${series.tmdb_id || series.tmdbId || series.imdb_id || series.imdbId || ""}`;
@@ -925,11 +1361,12 @@ export default function HomePage() {
                       <Link key={`tv-popular-${series.tmdb_id ?? series.imdb_id ?? index}-${index}`} href={href} className="group block">
                         <div className="bg-white rounded shadow overflow-hidden">
                           <div className="relative aspect-[2/3]">
-                            <Image
-                              src={series.poster_path ? getTVImageUrl(series.poster_path, "w500") : "/placeholder.svg"}
+                            <img
+                              src={getTvCardPoster(series.poster_path)}
                               alt={name}
-                              fill
-                              className="object-cover"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              className="absolute inset-0 h-full w-full object-cover"
                             />
                             <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                               TV
@@ -948,7 +1385,7 @@ export default function HomePage() {
                         </div>
                       </Link>
                     );
-                  })}
+                  }))}
                 </div>
               </section>
 
@@ -960,7 +1397,12 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className={homeGridClass}>
-                  {featuredTvSeries.slice(0, DISPLAY_COUNT).map((series: any, index: number) => {
+                  {featuredTvSeries.length === 0 && !tvHomeLoading ? (
+                    <div className="col-span-full rounded bg-white px-4 py-8 text-center text-gray-600">
+                      Featured TV-Series abhi load nahi hui, refresh karke check karein.
+                    </div>
+                  ) : (
+                    featuredTvSeries.slice(0, DISPLAY_COUNT).map((series: any, index: number) => {
                     const name = series.name || `TV Series ${series.imdb_id || series.tmdb_id || index}`;
                     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
                     const href = `/${slug}-${series.tmdb_id || series.tmdbId || series.imdb_id || series.imdbId || ""}`;
@@ -972,11 +1414,12 @@ export default function HomePage() {
                       <Link key={`tv-featured-${series.tmdb_id ?? series.imdb_id ?? index}-${index}`} href={href} className="group block">
                         <div className="bg-white rounded shadow overflow-hidden">
                           <div className="relative aspect-[2/3]">
-                            <Image
-                              src={series.poster_path ? getTVImageUrl(series.poster_path, "w500") : "/placeholder.svg"}
+                            <img
+                              src={getTvCardPoster(series.poster_path)}
                               alt={name}
-                              fill
-                              className="object-cover"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              className="absolute inset-0 h-full w-full object-cover"
                             />
                             <span className="absolute top-2 right-2 bg-[#79c142] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                               TV
@@ -995,7 +1438,7 @@ export default function HomePage() {
                         </div>
                       </Link>
                     );
-                  })}
+                  }))}
                 </div>
               </section>
             </>
@@ -1096,3 +1539,4 @@ export default function HomePage() {
     </div>
   );
 }
+

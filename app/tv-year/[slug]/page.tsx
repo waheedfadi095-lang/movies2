@@ -21,9 +21,12 @@ export default function TVYearPage() {
   const params = useParams();
   const slug = params.slug as string;
   const year = parseInt(slug);
-  const [displayCount, setDisplayCount] = useState(7);
   const [allSeriesData, setAllSeriesData] = useState<any[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const ITEMS_PER_PAGE = 24;
   
   // Set page title
   useEffect(() => {
@@ -32,43 +35,51 @@ export default function TVYearPage() {
     }
   }, [year]);
 
-  // Load TV series data from MongoDB API
+  const fetchSeries = async (skip: number, append: boolean) => {
+    try {
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+
+      const response = await fetch(
+        `/api/tv-series-db?limit=${ITEMS_PER_PAGE}&skip=${skip}&year=${year}&sortBy=first_air_date&sortOrder=desc&enrich=1`
+      );
+      const result = await response.json();
+
+      if (result.success && Array.isArray(result.data)) {
+        const seriesData = result.data.map((data: any) => ({
+          imdb_id: data.imdb_id,
+          tmdb_id: data.tmdb_id,
+          name: data.name || `TV Series ${data.imdb_id}`,
+          poster_path: data.poster_path,
+          backdrop_path: data.backdrop_path,
+          overview: data.overview,
+          first_air_date: data.first_air_date,
+          vote_average: data.vote_average || 0,
+          number_of_seasons: data.number_of_seasons || data.seasons?.length || 0,
+          episodeCount:
+            data.number_of_episodes ||
+            data.seasons?.reduce((sum: number, season: any) => sum + (season?.episodes?.length || 0), 0) || 0,
+        }));
+
+        setAllSeriesData((prev) => (append ? [...prev, ...seriesData] : seriesData));
+        setTotalCount(Number(result.total || 0));
+        setHasMore(Boolean(result.hasMore));
+      } else if (!append) {
+        setAllSeriesData([]);
+        setHasMore(false);
+        setTotalCount(0);
+      }
+    } catch (error) {
+      console.error("Error loading TV series data:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
     if (!year || isNaN(year)) return;
-    
-    setLoading(true);
-    
-    // Fetch series by year from MongoDB
-    console.log(`Fetching TV series for year: ${year}`);
-    fetch(`/api/tv-series-db?limit=100&year=${year}&sortBy=vote_average&sortOrder=desc`)
-      .then(res => res.json())
-      .then(result => {
-        console.log(`TV series API response for year ${year}:`, result);
-        if (result.success && result.data) {
-          const seriesData = result.data.map((data: any) => ({
-      imdb_id: data.imdb_id,
-      tmdb_id: data.tmdb_id,
-      name: data.name || `TV Series ${data.imdb_id}`,
-      poster_path: data.poster_path,
-      backdrop_path: data.backdrop_path,
-      overview: data.overview,
-      first_air_date: data.first_air_date,
-      vote_average: data.vote_average || 0,
-      number_of_seasons: data.number_of_seasons || data.seasons?.length || 0,
-      episodeCount: data.seasons?.reduce((sum: number, season: any) => sum + season.episodes.length, 0) || 0
-          }));
-          
-          setAllSeriesData(seriesData);
-          console.log(`Loaded ${seriesData.length} series for year ${year}`);
-        } else {
-          console.log(`No data found for year ${year}`);
-        }
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('Error loading TV series data:', error);
-        setLoading(false);
-      });
+    fetchSeries(0, false);
   }, [year]);
   
   if (!year || isNaN(year)) {
@@ -87,7 +98,7 @@ export default function TVYearPage() {
     );
   }
   
-  const seriesInYear = allSeriesData.slice(0, displayCount);
+  const seriesInYear = allSeriesData;
 
   return (
     <>
@@ -115,12 +126,18 @@ export default function TVYearPage() {
           <h1 className="text-4xl font-bold text-white mb-2">{year} TV Shows</h1>
           <p className="text-gray-400">TV shows and series released in {year}</p>
           <p className="text-purple-400 mt-2 text-sm">
-            📺 {allSeriesData.length.toLocaleString()} TV shows from {year} • Sorted by rating
+            📺 {loading ? "Loading..." : `Showing ${allSeriesData.length} of ${totalCount.toLocaleString()} TV shows from ${year} • Latest first`}
           </p>
         </div>
 
         {/* Series Grid */}
-        {seriesInYear.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4 animate-pulse">📺</div>
+            <h2 className="text-2xl font-bold text-white mb-2">Loading TV Shows...</h2>
+            <p className="text-gray-400">Please wait</p>
+          </div>
+        ) : seriesInYear.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">📺</div>
             <h2 className="text-2xl font-bold text-white mb-2">No TV Shows Available</h2>
@@ -180,16 +197,17 @@ export default function TVYearPage() {
             </div>
             
             {/* Load More Button */}
-            {displayCount < allSeriesData.length && (
+            {hasMore && (
               <div className="text-center mt-8">
                 <button
-                  onClick={() => setDisplayCount(prev => Math.min(prev + 7, allSeriesData.length))}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                  onClick={() => fetchSeries(allSeriesData.length, true)}
+                  disabled={loadingMore}
+                  className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-semibold transition-colors shadow-lg"
                 >
-                  Load More ({allSeriesData.length - displayCount} remaining)
+                  {loadingMore ? "Loading..." : `Load More (${Math.max(0, totalCount - allSeriesData.length)} remaining)`}
                 </button>
                 <p className="text-gray-400 text-sm mt-2">
-                  Showing {displayCount} of {allSeriesData.length} series from {year}
+                  Showing {allSeriesData.length} of {totalCount.toLocaleString()} series from {year}
                 </p>
               </div>
             )}

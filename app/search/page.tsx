@@ -4,8 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { getMoviesByImdbIds, getYear, searchMoviesByTitle } from "@/api/tmdb";
-import { getRandomMovieIds } from "@/data/bulkMovieIds";
+import { getYear } from "@/api/tmdb";
 import type { Movie } from "@/api/tmdb";
 import { generateMovieUrl } from "@/lib/slug";
 import Head from "next/head";
@@ -15,62 +14,54 @@ function SearchResultsContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
   const [results, setResults] = useState<Movie[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const performSearch = async () => {
-      if (!query.trim()) {
-        setResults([]);
-        setLoading(false);
-        return;
+  const LIMIT = 24;
+
+  const fetchPage = async (targetPage: number, append: boolean) => {
+    if (!query.trim()) return;
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tmdb-search-movies?q=${encodeURIComponent(query.trim())}&page=${targetPage}&limit=${LIMIT}`);
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result?.error || "Search request failed");
       }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Use TMDB search API for better results
-        const searchResults = await searchMoviesByTitle(query, 50);
-        
-        // Convert to Movie type for consistency
-        const moviesData = searchResults
-          .filter(movie => movie.imdb_id && movie.imdb_id.trim() !== '') // Only include movies with valid imdb_id
-          .map(movie => ({
-            ...movie,
-            imdb_id: movie.imdb_id!, // We know it exists due to filter
-            overview: '', // Will be filled if needed
-            genres: [], // Will be filled if needed
-            vote_count: 0,
-            popularity: 0,
-            adult: false,
-            original_language: 'en',
-            original_title: movie.title,
-            backdrop_path: movie.backdrop_path || null,
-          }));
-        
-        // Sort by relevance (exact matches first, then partial matches)
-        const sorted = moviesData.sort((a, b) => {
-          const aExact = a.title.toLowerCase() === query.toLowerCase();
-          const bExact = b.title.toLowerCase() === query.toLowerCase();
-          
-          if (aExact && !bExact) return -1;
-          if (!aExact && bExact) return 1;
-          
-          return (b.vote_average || 0) - (a.vote_average || 0);
-        });
-        
-        setResults(sorted.slice(0, 60)); // Show up to 60 results
-      } catch (error) {
-        console.error('Error searching movies:', error);
-        setError('Failed to search movies. Please try again.');
-        setResults([]);
-      }
-
+      const items = Array.isArray(result.data) ? result.data : [];
+      setResults((prev) => (append ? [...prev, ...items] : items));
+      const p = result.pagination || {};
+      setPage(p.page || targetPage);
+      setTotalResults(p.total || 0);
+      setTotalPages(p.pages || 0);
+      setHasMore(Boolean(p.hasMore));
+    } catch (err) {
+      console.error("Error searching movies:", err);
+      setError("Failed to search movies. Please try again.");
+      if (!append) setResults([]);
+    } finally {
       setLoading(false);
-    };
+      setLoadingMore(false);
+    }
+  };
 
-    performSearch();
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setTotalResults(0);
+      setTotalPages(0);
+      setHasMore(false);
+      setLoading(false);
+      return;
+    }
+    fetchPage(1, false);
   }, [query]);
 
   if (loading) {
@@ -98,8 +89,8 @@ function SearchResultsContent() {
             Search Results
           </h1>
           <p className="text-gray-400">
-            {results.length > 0 
-              ? `Found ${results.length} movie${results.length !== 1 ? 's' : ''} for &quot;${query}&quot;`
+            {results.length > 0
+              ? `Found ${totalResults} movie${totalResults !== 1 ? 's' : ''} for "${query}" • Page ${page}/${Math.max(1, totalPages)}`
               : `No movies found for "${query}"`
             }
           </p>
@@ -134,57 +125,73 @@ function SearchResultsContent() {
 
         {/* Search Results Grid */}
         {results.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {results.map((movie, index) => (
-              <Link
-                key={`${movie.imdb_id}-${index}`}
-                href={generateMovieUrl(movie.title, movie.imdb_id || '')}
-                className="group relative bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                {/* Movie Poster */}
-                <div className="relative aspect-[2/3] bg-gray-700">
-                  <Image
-                    src={resolvePosterUrl(movie.poster_path, "w500")}
-                    alt={movie.title}
-                    fill
-                    className="object-cover group-hover:brightness-110 transition-all duration-300"
-                    onError={(e) => {
-                      console.log('Search page poster error:', movie.title, movie.poster_path);
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/placeholder.svg';
-                    }}
-                  />
-                  
-                  {/* Play Button Overlay */}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
-                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {results.map((movie, index) => (
+                <Link
+                  key={`${movie.imdb_id}-${index}`}
+                  href={generateMovieUrl(movie.title, movie.imdb_id || '')}
+                  className="group relative bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                >
+                  {/* Movie Poster */}
+                  <div className="relative aspect-[2/3] bg-gray-700">
+                    <Image
+                      src={resolvePosterUrl(movie.poster_path, "w500")}
+                      alt={movie.title}
+                      fill
+                      className="object-cover group-hover:brightness-110 transition-all duration-300"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/placeholder.svg';
+                      }}
+                    />
+                    
+                    {/* Play Button Overlay */}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Movie Info */}
-                <div className="p-3">
-                  <h3 className="text-white font-semibold text-sm line-clamp-2 group-hover:text-purple-400 transition-colors">
-                    {movie.title}
-                  </h3>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-gray-400 text-xs">
-                      {getYear(movie.release_date)}
-                    </span>
-                    <div className="flex items-center">
-                      <span className="text-yellow-400 text-xs">⭐</span>
-                      <span className="text-gray-400 text-xs ml-1">
-                        {movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}
+                  {/* Movie Info */}
+                  <div className="p-3">
+                    <h3 className="text-white font-semibold text-sm line-clamp-2 group-hover:text-purple-400 transition-colors">
+                      {movie.title}
+                    </h3>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-gray-400 text-xs">
+                        {getYear(movie.release_date)}
                       </span>
+                      <div className="flex items-center">
+                        <span className="text-yellow-400 text-xs">⭐</span>
+                        <span className="text-gray-400 text-xs ml-1">
+                          {movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-8 flex flex-col items-center gap-3">
+              <p className="text-sm text-gray-400">
+                Showing {results.length} of {totalResults}
+              </p>
+              {hasMore && (
+                <button
+                  onClick={() => fetchPage(page + 1, true)}
+                  disabled={loadingMore}
+                  className="rounded-md bg-purple-600 px-6 py-2.5 font-semibold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loadingMore ? "Loading..." : `Load More (Page ${page + 1}/${Math.max(1, totalPages)})`}
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>

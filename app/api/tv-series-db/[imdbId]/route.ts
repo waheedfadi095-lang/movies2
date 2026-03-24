@@ -1,8 +1,8 @@
-// API Route: Fetch Single TV Series by IMDB ID from MongoDB
-import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb-client';
+// API Route: Fetch single TV series by IMDB ID (IDs source + metadata cache)
+import { NextRequest, NextResponse } from "next/server";
+import { getAllSeriesIds, getSeriesMeta } from "@/lib/serverSeriesCache";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
@@ -10,22 +10,20 @@ export async function GET(
 ) {
   try {
     const { imdbId } = await params;
-
-    const client = await clientPromise;
-    if (!client) {
+    const ids = getAllSeriesIds();
+    if (!ids.includes(imdbId)) {
       return NextResponse.json(
-        { success: false, error: 'Series not found' },
+        { success: false, error: "Series not found" },
         { status: 404 }
       );
     }
-    const db = client.db('moviesDB');
-    const collection = db.collection('tvSeries');
 
-    const series = await collection.findOne({ imdb_id: imdbId });
+    const enrich = request.nextUrl.searchParams.get("enrich") === "1";
+    const series = await getSeriesMeta(imdbId, enrich);
 
     if (!series) {
       return NextResponse.json(
-        { success: false, error: 'Series not found' },
+        { success: false, error: "Series not found" },
         { status: 404 }
       );
     }
@@ -36,9 +34,9 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching TV series:', error);
+    console.error("Error fetching TV series:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch TV series' },
+      { success: false, error: "Failed to fetch TV series" },
       { status: 500 }
     );
   }
