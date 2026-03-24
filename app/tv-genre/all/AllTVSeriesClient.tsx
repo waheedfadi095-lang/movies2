@@ -12,6 +12,7 @@ type SeriesItem = {
   poster_path?: string;
   first_air_date?: string;
   vote_average?: number;
+  number_of_episodes?: number;
   number_of_seasons?: number;
   seasons?: Array<{ episodes?: any[] }>;
 };

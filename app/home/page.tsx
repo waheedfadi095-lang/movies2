@@ -771,8 +771,7 @@ export default function HomePage() {
           refSuggestTitles,
           moviePoolDeduped,
           limit,
-          new Set(),
-          0
+          new Set()
         );
         if (suggMovies.length === 0 && moviePoolDeduped.length > 0) {
           suggMovies = fillToMinMovies([], moviePoolDeduped, limit, new Set(), 12).map((movie) => ({
@@ -801,8 +800,7 @@ export default function HomePage() {
           refLatestTitles,
           moviePoolDeduped,
           limit,
-          usedInSuggestions,
-          0
+          usedInSuggestions
         );
         if (latestM.length === 0 && moviePoolDeduped.length > 0) {
           latestM = fillToMinMovies([], moviePoolDeduped, limit, usedInSuggestions, 12).map((movie) => ({
