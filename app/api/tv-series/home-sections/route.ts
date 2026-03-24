@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-function uniqKey(x: any): string {
+type SeriesItem = Record<string, any>;
+
+function uniqKey(x: SeriesItem): string {
   return String(x?.imdb_id || x?.tmdb_id || "");
 }
 
 /** Primary order preserved; pad from filler (latest-first) until `max` unique imdb/tmdb ids. */
-function mergeUniquePad(primary: any[], filler: any[], max: number): any[] {
+function mergeUniquePad(primary: SeriesItem[], filler: SeriesItem[], max: number): SeriesItem[] {
   const seen = new Set<string>();
   const out: any[] = [];
   for (const x of primary) {
@@ -68,13 +70,13 @@ export async function GET(request: NextRequest) {
     if (popularItems.length < limit) {
       popularItems = mergeUniquePad(popularItems, latestItems, limit);
     }
-    const popularKeys = new Set(popularItems.map((x) => uniqKey(x)).filter(Boolean));
+    const popularKeys = new Set(popularItems.map((x: SeriesItem) => uniqKey(x)).filter(Boolean));
     const featuredPreferNotPopular = latestItems
       .slice(limit * 2)
-      .filter((x) => !popularKeys.has(uniqKey(x)));
+      .filter((x: SeriesItem) => !popularKeys.has(uniqKey(x)));
     featuredItems = mergeUniquePad(featuredItems, featuredPreferNotPopular, limit);
     if (featuredItems.length < limit) {
-      const latestNoPopular = latestItems.filter((x) => !popularKeys.has(uniqKey(x)));
+      const latestNoPopular = latestItems.filter((x: SeriesItem) => !popularKeys.has(uniqKey(x)));
       featuredItems = mergeUniquePad(featuredItems, latestNoPopular, limit);
     }
 
