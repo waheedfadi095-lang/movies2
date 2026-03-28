@@ -3,6 +3,7 @@ import {
   getSeriesMeta as storeMeta,
   getTvSeriesList,
   hasSeriesDetails,
+  hasSeriesInStore,
 } from "@/lib/tvSeriesStore";
 
 export function getAllSeriesIds(): string[] {
@@ -23,4 +24,6 @@ export function getSeriesCacheState() {
     hasDetails: hasSeriesDetails(),
   };
 }
+
+export { hasSeriesInStore };
 

@@ -1,6 +1,6 @@
 // API Route: Fetch single TV series by IMDB ID (IDs source + metadata cache)
 import { NextRequest, NextResponse } from "next/server";
-import { getAllSeriesIds, getSeriesMeta } from "@/lib/serverSeriesCache";
+import { getSeriesMeta, hasSeriesInStore } from "@/lib/serverSeriesCache";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +10,7 @@ export async function GET(
 ) {
   try {
     const { imdbId } = await params;
-    const ids = getAllSeriesIds();
-    if (!ids.includes(imdbId)) {
+    if (!hasSeriesInStore(imdbId)) {
       return NextResponse.json(
         { success: false, error: "Series not found" },
         { status: 404 }

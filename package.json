@@ -4,10 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "NODE_OPTIONS='--max-old-space-size=8192' next build",
+    "build": "node --max-old-space-size=8192 node_modules/next/dist/bin/next build",
     "start": "next start",
     "lint": "eslint",
-    "screenshot:landings": "node scripts/capture-landing-screenshots.mjs"
+    "screenshot:landings": "node scripts/capture-landing-screenshots.mjs",
+    "daily:sync": "node scripts/daily-sync.js",
+    "sync:recent": "node scripts/daily-sync.js --recent --pages=6 --batch=5",
+    "sync:recent:watch": "node scripts/daily-sync.js --recent --pages=6 --batch=5 --watch=1440",
+    "sync:daily:check": "node scripts/daily-sync.js --recent --pages=6 --batch=5",
+    "home:snapshot:update": "node scripts/build-home-snapshot-local.mjs",
+    "home:snapshot:api": "node scripts/home-snapshot-update.mjs",
+    "sync:source-recent": "node scripts/sync-recent-from-source.js --limit=500"
   },
   "dependencies": {
     "dotenv": "^16.6.1",

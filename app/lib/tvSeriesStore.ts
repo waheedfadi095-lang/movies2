@@ -88,16 +88,31 @@ function normalize(id: string, map: Map<string, SeriesDoc>): SeriesDoc {
 }
 
 export function getTvSeriesCount() {
-  return TV_SERIES_IDS.length;
+  if (TV_SERIES_IDS.length > 0) return TV_SERIES_IDS.length;
+  return getMap().size;
 }
 
 export function getAllSeriesIds(): string[] {
-  return TV_SERIES_IDS;
+  if (TV_SERIES_IDS.length > 0) return TV_SERIES_IDS;
+  return Array.from(getMap().keys());
+}
+
+/** When ID list is empty, allow lookup only for series present in local details JSON. */
+export function hasSeriesInStore(imdbId: string): boolean {
+  if (TV_SERIES_IDS.length > 0) return TV_SERIES_IDS.includes(imdbId);
+  return getMap().has(imdbId);
 }
 
 export function getTvSeriesList(): SeriesDoc[] {
   const map = getMap();
-  return TV_SERIES_IDS.map((id) => normalize(id, map));
+  if (TV_SERIES_IDS.length > 0) {
+    return TV_SERIES_IDS.map((id) => normalize(id, map));
+  }
+  if (map.size === 0) return [];
+  return Array.from(map.values()).map((doc) => ({
+    ...doc,
+    imdb_id: doc.imdb_id || (doc as SeriesDoc).imdb_id,
+  }));
 }
 
 export function getTvSeriesByImdbId(imdbId: string): SeriesDoc | null {
@@ -114,7 +129,7 @@ export function hasSeriesDetails(): boolean {
 }
 
 export async function getSeriesMeta(imdbId: string, enrich: boolean = false): Promise<SeriesDoc | null> {
-  if (!TV_SERIES_IDS.includes(imdbId)) return null;
+  if (TV_SERIES_IDS.length > 0 && !TV_SERIES_IDS.includes(imdbId)) return null;
   if (!enrich) return getTvSeriesByImdbId(imdbId);
   return enrichTvSeries(imdbId);
 }
